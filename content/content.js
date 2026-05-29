@@ -437,27 +437,7 @@
     }
   }
 
-  /**
-   * Handles UI feedback when error messages are received.
-   */
-  class CrashHandler {
-    static handle(message) {
-      if (message?.message === "crash") {
-        const trackElement = document.querySelector(`[track-id='${message.id}']`);
-        if (trackElement) {
-          trackElement.innerHTML = `
-            <button
-              class="button button_round button_action button-play button-play__type_track button_ico"
-              id="_yamusic_save_button"
-              style="background-color: #ff3333"
-              title="Произошла ошибка... Нажмите на иконку, чтобы скачать ещё раз.">
-              error
-            </button>
-          `;
-        }
-      }
-    }
-  }
+
 
   /**
    * Entry Point Class.
@@ -482,7 +462,6 @@
 
     launch() {
       document.addEventListener("DOMContentLoaded", () => this.#initObserver());
-      browserApi.runtime.onMessage.addListener(CrashHandler.handle);
     }
   }
 
