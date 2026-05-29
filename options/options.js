@@ -34,11 +34,9 @@
 
         if (config.folder === true) {
           elements.folderNameInput.value = config.path || "";
-          elements.folderContainer.style.visibility = "visible";
-          elements.folderContainer.style.height = "auto";
+          elements.folderContainer.style.display = "flex";
         } else {
-          elements.folderContainer.style.visibility = "hidden";
-          elements.folderContainer.style.height = "0";
+          elements.folderContainer.style.display = "none";
         }
       }
     );

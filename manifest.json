@@ -1,7 +1,8 @@
 {
+  "$schema": "https://json.schemastore.org/chrome-manifest",
   "manifest_version": 3,
   "name": "YandexMusicDownloader",
-  "short_name": "YandexMusicDownloader",
+  "short_name": "YMDownloader",
   "description": "Скачивайте любые треки с Яндекс.Музыка в высоком качестве. Просто и удобно!",
   "version": "0.1.0",
   "minimum_chrome_version": "109",
@@ -39,7 +40,8 @@
 
   "options_page": "options/options.html",
   "options_ui": {
-    "page": "options/options.html"
+    "page": "options/options.html",
+    "open_in_tab": true
   },
 
   "icons": {
