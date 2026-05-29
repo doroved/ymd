@@ -233,6 +233,7 @@
    * Внедряет кнопку группового скачивания в заголовок плейлиста/альбома
    */
   const injectHeaderButton = (container) => {
+    // Делаем глобальную проверку в контейнере, чтобы не дублировать кнопку во вложенных селекторах
     if (container.querySelector("._yamusic_save_next")) return;
 
     const button = document.createElement("button");
@@ -333,7 +334,8 @@
       }
     });
 
-    container.appendChild(button);
+    // Вставляем строго в начало контейнера, перед кнопкой "Слушать"
+    container.prepend(button);
   };
 
   /**
@@ -346,11 +348,14 @@
       injectTrackButton(track);
     });
 
-    // 2. Элементы управления в шапках плейлистов/альбомов (ищет PageHeaderBase_controls и др.)
-    document.querySelectorAll('div[class*="PageHeaderBase_controls"]:not(._ym_ready_hdr), div[class*="CommonPageHeader_controls"]:not(._ym_ready_hdr), div[class*="PageHeaderPlaylist_mainControls"]:not(._ym_ready_hdr), div[class*="PageHeaderAlbumControls_controls"]:not(._ym_ready_hdr)').forEach(header => {
+    // 2. Элементы управления в шапках (строго по CommonPageHeader_controls__ или PageHeaderPlaylist_mainControls)
+    const headerSelectors = 'div[class*="CommonPageHeader_controls__"], div[class*="PageHeaderPlaylist_mainControls"]';
+
+    const header = document.querySelector(headerSelectors);
+    if (header && !header.classList.contains('_ym_ready_hdr')) {
       header.classList.add('_ym_ready_hdr');
       injectHeaderButton(header);
-    });
+    }
   };
 
   const init = () => {

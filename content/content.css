@@ -38,7 +38,7 @@ div[class*="mainControls"] ._yamusic_save_next,
 div[class*="PageHeaderBase_controls"] ._yamusic_save_next {
   width: 40px;
   height: 40px;
-  margin-left: 12px;
+  margin: 0;
 }
 
 div[class*="controls"] ._yamusic_save_next svg,
