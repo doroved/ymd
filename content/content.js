@@ -71,83 +71,50 @@
   }
 
   /**
-   * Extracts metadata from Yandex Music track DOM elements.
+   * Extracts minimal identifiers from Yandex Music track DOM elements.
    */
   class DOMMetadataExtractor {
     /**
-     * Parses track DOM element to build metadata object
+     * Parses track DOM element to find track ID and default position
      * @param {HTMLElement} element Track DOM container
      */
     static extract(element) {
-      let trackId, position, title, artists, album, year, coverUrl;
+      let trackId = null;
+      let position = 0;
 
-      // 1. Extract position in playlist
+      // 1. Extract position in playlist from DOM
       try {
-        position = element.querySelector("div[class*='PlayButtonWithPosition_root']")?.textContent || 0;
+        const posText = element.querySelector("div[class*='PlayButtonWithPosition_root']")?.textContent || "0";
+        position = parseInt(posText, 10) || 0;
       } catch (e) {
         position = 0;
       }
 
-      // 2. Extract track ID from track/album link
+      // 2. Extract track ID from any link containing "/track/" inside container
       try {
-        const href = element.querySelector("a[class*='Meta_albumLink__']")?.getAttribute("href");
-        if (href) {
-          // Expected href format: /album/123/track/456
-          trackId = href.split("/")[4];
-        }
-      } catch (e) {}
-
-      if (!trackId) return null;
-
-      // 3. Extract title
-      try {
-        title = element.querySelector("span[class*='Meta_title__']")?.textContent?.trim() ||
-                element.querySelector("a[class*='Meta_albumLink__']")?.textContent?.trim() || "";
-      } catch (e) {
-        title = "";
-      }
-
-      // 4. Extract artists (join multiple with comma)
-      try {
-        const artistElements = element.querySelectorAll("span[class*='Meta_artistCaption__']");
-        if (artistElements.length > 0) {
-          artists = Array.from(artistElements).map(el => el.textContent.trim()).join(", ");
-        } else {
-          // Fallback to page header artists (e.g. if parsing from bottom player bar)
-          const headerArtists = document.querySelectorAll("span[class*='PageHeaderAlbumMeta_artistLabel__']");
-          artists = Array.from(headerArtists).map(el => el.textContent.trim()).join(", ");
+        const links = element.querySelectorAll("a");
+        for (const link of links) {
+          const href = link.getAttribute("href") || "";
+          if (href.includes("/track/")) {
+            // Href format is usually /album/123/track/456 or /track/456
+            const parts = href.split("/");
+            const trackIdx = parts.indexOf("track");
+            if (trackIdx !== -1 && parts[trackIdx + 1]) {
+              trackId = parts[trackIdx + 1];
+              break;
+            }
+          }
         }
       } catch (e) {
-        artists = "";
+        console.error("DOM trackId extraction failed:", e);
       }
 
-      // 5. Extract album title from page header
-      try {
-        const albumHeaders = document.querySelectorAll("span[class*='PageHeaderTitle_font_short__']");
-        album = Array.from(albumHeaders).map(el => el.textContent.trim()).join(" ");
-      } catch (e) {
-        album = "";
+      // Fallback: search track-id attribute if page elements are heavily customized
+      if (!trackId) {
+        trackId = element.getAttribute("track-id") || element.getAttribute("data-track-id");
       }
 
-      // 6. Extract album release year from page header
-      try {
-        year = document.querySelector("div[class*='PageHeaderAlbumMeta_year_dot__']")?.textContent || "";
-      } catch (e) {
-        year = "";
-      }
-
-      // 7. Extract cover image URL
-      try {
-        const coverImg = element.querySelector("img[class*='PlayButtonWithCover_coverImage__']") ||
-                         document.querySelector("img[class*='PageHeaderCover_coverImage__']");
-        if (coverImg) {
-          coverUrl = coverImg.getAttribute("src");
-        }
-      } catch (e) {
-        coverUrl = "";
-      }
-
-      return { trackId, position, title, artist: artists, album, year, coverUrl };
+      return trackId ? { trackId, position } : null;
     }
   }
 
@@ -162,26 +129,82 @@
     /**
      * Adds track to download queue or triggers immediate execution if under threshold
      */
-    enqueue(buttonElement, trackId, position, title, artist, album, year, coverUrl) {
+    enqueue(buttonElement, trackId, position) {
       this.#activeCount += 1;
 
       if (this.#activeCount > DownloadQueue.#MAX_CONCURRENT_DOWNLOADS) {
-        this.#queue.push([buttonElement, trackId, position, title, artist, album, year, coverUrl]);
+        this.#queue.push([buttonElement, trackId, position]);
       } else {
-        this.#processDownload(buttonElement, trackId, position, title, artist, album, year, coverUrl);
+        this.#processDownload(buttonElement, trackId, position);
       }
     }
 
     /**
-     * Orchestrates track download: gets API url, fetches MP3, gets cover, writes ID3 tags, saves file.
+     * Orchestrates track download: gets API metadata, signs request, fetches MP3, gets cover, writes ID3 tags, saves file.
      */
-    async #processDownload(buttonElement, trackId, position, title, artist, album, year, coverUrl) {
+    async #processDownload(buttonElement, trackId, fallbackPosition) {
       const config = await StorageHelper.get(["quality", "tags", "folder", "path", "position", "cover"]);
       const quality = config.quality || "hq";
       const coverSize = config.cover || "400x400";
 
       try {
-        // 1. Generate signed API url
+        // 1. Fetch precise metadata via official api.music.yandex.ru/tracks.
+        // Doing the fetch directly in the Content Script context automatically inherits
+        // the user's authorized session cookies (like Session_id) for same-site API requests.
+        const metadataUrl = "https://api.music.yandex.ru/tracks";
+        const metadataBody = `trackIds=${trackId}&removeDuplicates=false&withProgress=true`;
+
+        const apiResponse = await fetch(metadataUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "x-yandex-music-client": "YandexMusicWebNext/1.0.0",
+            "x-yandex-music-without-invocation-info": "1",
+            "X-Requested-With": "XMLHttpRequest"
+          },
+          credentials: "include",
+          body: metadataBody
+        }).then(res => res.json()).catch(err => {
+          console.error("Direct metadata fetch error:", err);
+          return null;
+        });
+
+        if (!apiResponse || !Array.isArray(apiResponse) || apiResponse.length === 0) {
+          throw new Error(`Failed to fetch API metadata for track ${trackId}`);
+        }
+
+        const trackData = apiResponse[0];
+
+        const title = trackData.title || "Unknown Track";
+        const artist = Array.isArray(trackData.artists)
+          ? trackData.artists.map(a => a.name).join(", ")
+          : "Unknown Artist";
+
+        const albumData = (Array.isArray(trackData.albums) && trackData.albums.length > 0)
+          ? trackData.albums[0]
+          : null;
+
+        const album = albumData ? albumData.title : "";
+        const year = albumData ? (albumData.year || "") : "";
+        const position = (albumData && albumData.trackPosition)
+          ? (albumData.trackPosition.index || fallbackPosition)
+          : fallbackPosition;
+
+        const genre = albumData ? (albumData.genre || "") : "";
+        const publisher = (albumData && Array.isArray(albumData.labels) && albumData.labels.length > 0)
+          ? (albumData.labels[0].name || "")
+          : "";
+
+        let trackNumber = "";
+        if (albumData && albumData.trackPosition) {
+          const index = albumData.trackPosition.index || fallbackPosition;
+          const total = albumData.trackCount;
+          trackNumber = (index && total) ? `${index}/${total}` : `${index || ""}`;
+        } else if (fallbackPosition > 0) {
+          trackNumber = `${fallbackPosition}`;
+        }
+
+        // 2. Generate signed stream info URL
         const signData = await SignatureGenerator.generate(trackId, quality);
         const headers = {
           "x-yandex-music-client": "YandexMusicWebNext/1.0.0",
@@ -190,7 +213,7 @@
           "Referer": "https://music.yandex.ru/"
         };
 
-        // 2. Fetch download info via background script proxy
+        // 3. Fetch stream URL via background script proxy
         const info = await browserApi.runtime.sendMessage({
           message: "downloadInfo",
           url: signData.url,
@@ -198,26 +221,27 @@
         });
 
         if (!info || !info.downloadInfo?.url) {
-          throw new Error("Failed to retrieve download URL");
+          throw new Error("Failed to retrieve stream URL from Yandex API");
         }
 
         const directMp3Url = decodeURIComponent(info.downloadInfo.url);
 
-        // 3. Prepare nice file name
-        const cleanName = PathSanitizer.sanitize(`${artist} - ${title}.mp3`);
-
-        // 4. Fetch direct MP3 buffer
+        // 4. Fetch direct MP3 buffer in memory
         const mp3Buffer = await fetch(directMp3Url).then(res => res.arrayBuffer());
 
-        // 5. Fetch artwork if cover URL is available
+        // 5. Fetch artwork if available in API response
         let coverBuffer = null;
-        if (coverUrl) {
-          // Replace Yandex image resolution template with user selection (e.g. 100x100 -> 400x400)
-          const highResCoverUrl = coverUrl.replace(/100x100|200x200|300x300|400x400/, coverSize);
+        const coverRawUri = trackData.coverUri || (albumData ? albumData.coverUri : null) || (trackData.ogImage ? trackData.ogImage : null);
+
+        if (coverRawUri) {
+          // Normalize uri prefix format: add https:// if missing, and replace %% template with user quality choice
+          let coverCleanUrl = coverRawUri.startsWith("http") ? coverRawUri : `https://${coverRawUri}`;
+          coverCleanUrl = coverCleanUrl.replace("%%", coverSize);
+
           try {
-            coverBuffer = await fetch(decodeURIComponent(highResCoverUrl)).then(res => res.arrayBuffer());
+            coverBuffer = await fetch(coverCleanUrl).then(res => res.arrayBuffer());
           } catch (e) {
-            console.warn("Could not download high-res album cover", e);
+            console.warn("Could not download album cover art:", e);
           }
         }
 
@@ -229,6 +253,30 @@
               .setFrame("TALB", album)
               .setFrame("TYER", year);
 
+        if (genre) {
+          try {
+            writer.setFrame("TCON", [genre]);
+          } catch (e) {
+            console.error("Failed to inject TCON (genre) frame:", e);
+          }
+        }
+
+        if (trackNumber) {
+          try {
+            writer.setFrame("TRCK", trackNumber);
+          } catch (e) {
+            console.error("Failed to inject TRCK (track number) frame:", e);
+          }
+        }
+
+        if (publisher) {
+          try {
+            writer.setFrame("TPUB", publisher);
+          } catch (e) {
+            console.error("Failed to inject TPUB (publisher/label) frame:", e);
+          }
+        }
+
         if (coverBuffer) {
           try {
             writer.setFrame("APIC", {
@@ -237,7 +285,7 @@
               description: ""
             });
           } catch (e) {
-            console.error("Failed to inject cover art frame into ID3 tags", e);
+            console.error("Failed to inject cover art frame into ID3 tags:", e);
           }
         }
 
@@ -245,15 +293,15 @@
           writer.addTag();
         }
 
-        // 7. Structure the final filename
-        const structuredFilename = this.#formatFilename(cleanName, position, config);
+        // 7. Structure final clean filename and trigger Chrome Download API
+        const cleanFilename = PathSanitizer.sanitize(`${artist} - ${title}.mp3`);
+        const structuredFilename = this.#formatFilename(cleanFilename, position, config);
 
-        // 8. Send download request to background script
-        this.#triggerSystemDownload(writer.getURL(), structuredFilename, trackId, position, title, artist, album, year, coverUrl);
+        this.#triggerSystemDownload(writer.getURL(), structuredFilename, trackId);
 
       } catch (err) {
         console.error(`Download process failed for track ${trackId}:`, err);
-        this.#onDownloadComplete(trackId, position, title, artist, album, year, coverUrl);
+        this.#onDownloadComplete(trackId);
       }
     }
 
@@ -265,7 +313,7 @@
       return `${positionPrefix}${filename}`;
     }
 
-    #triggerSystemDownload(blobUrl, filename, trackId, position, title, artist, album, year, coverUrl) {
+    #triggerSystemDownload(blobUrl, filename, trackId) {
       browserApi.runtime.sendMessage({
         message: "download",
         url: blobUrl,
@@ -273,12 +321,12 @@
       }, (response) => {
         if (response?.status === "done") {
           this.#activeCount -= 1;
-          this.#onDownloadComplete(trackId, position, title, artist, album, year, coverUrl);
+          this.#onDownloadComplete(trackId);
         }
       });
     }
 
-    #onDownloadComplete(trackId, position, title, artist, album, year, coverUrl) {
+    #onDownloadComplete(trackId) {
       // Process next item in download queue
       if (this.#queue.length > 0) {
         const nextItem = this.#queue.shift();
@@ -346,12 +394,7 @@
             queueInstance.enqueue(
               buttonElement,
               metadata.trackId,
-              metadata.position,
-              metadata.title,
-              metadata.artist,
-              metadata.album,
-              metadata.year,
-              metadata.coverUrl
+              metadata.position
             );
           }
         });
@@ -419,7 +462,7 @@
   /**
    * Entry Point Class.
    */
-  class YandexMusicPro {
+  class YandexMusicDownloader {
     #queue = new DownloadQueue();
 
     #initObserver = () => {
@@ -444,6 +487,6 @@
   }
 
   // Run the application
-  const app = new YandexMusicPro();
+  const app = new YandexMusicDownloader();
   app.launch();
 })();

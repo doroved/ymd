@@ -72,6 +72,42 @@ chrome.runtime.onStartup.addListener(async () => {
 
 // Message listener for content script requests
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.message === "trackMetadata") {
+    // Proxy request to tracks endpoint to fetch precise JSON metadata
+    const url = "https://api.music.yandex.ru/tracks";
+    const body = `trackIds=${message.trackId}&removeDuplicates=false&withProgress=true`;
+
+    fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-yandex-music-client": "YandexMusicWebNext/1.0.0",
+        "x-yandex-music-without-invocation-info": "1",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": "https://music.yandex.ru/"
+      },
+      body: body
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          sendResponse(false);
+          return;
+        }
+        try {
+          const json = await response.json();
+          sendResponse(json);
+        } catch (e) {
+          sendResponse(false);
+        }
+      })
+      .catch((err) => {
+        console.error("Metadata proxy fetch failed:", err);
+        sendResponse(false);
+      });
+
+    return true; // Keep channel open
+  }
+
   if (message.message === "downloadInfo") {
     // Proxy Yandex Music API requests to bypass CORS
     fetch(message.url, { headers: message.headers })
