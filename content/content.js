@@ -353,15 +353,34 @@
         return null;
       }
 
-      const button = document.createElement("div");
+      const button = document.createElement("button");
+      button.type = "button";
       button.classList.add("_yamusic_save_next");
       button.title = "Скачать";
-
-      const iconUrl = `chrome-extension://${browserApi.runtime.id}/images/save_icon.svg`;
-      button.style.backgroundImage = `url('${iconUrl}')`;
+      button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>';
 
       // Insert download button before the first control button
       container.insertBefore(button, buttons[0]);
+      return button;
+    }
+
+    /**
+     * Creates new DOM element for page header download button and appends it at the end
+     * @param {HTMLElement} container Header controls DOM container
+     */
+    static createHeader(container) {
+      if (container.querySelector("._yamusic_save_next")) {
+        return null; // Button already exists
+      }
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.classList.add("_yamusic_save_next");
+      button.title = "Скачать всё";
+      button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>';
+
+      // Append to the very end
+      container.appendChild(button);
       return button;
     }
 
@@ -409,13 +428,22 @@
     // Selectors for tracks in lists (new, old interfaces) and players bar
     static #TRACK_SELECTORS = '.d-track, .track, div[class*="Track_root"], section[class*="PlayerBarDesktop_root"]';
 
+    // Selectors for playlist/album controls in headers
+    static #HEADER_SELECTOR = 'div[class*="CommonPageHeader_controls__"], div[class*="PageHeaderPlaylist_mainControls__"], div[class*="PageHeaderAlbumControls_controls__"]';
+
     static scan(queueInstance) {
+      // 1. Scan tracks
       const trackContainers = document.querySelectorAll(TrackScanner.#TRACK_SELECTORS);
       for (const container of trackContainers) {
-        // Double check tags and inject buttons
         if (container.tagName === "DIV" || container.tagName === "SECTION") {
           TrackScanner.#injectButtonIfReady(container, queueInstance);
         }
+      }
+
+      // 2. Scan header controls (for album/playlist "Download All" button)
+      const headerControls = document.querySelectorAll(TrackScanner.#HEADER_SELECTOR);
+      for (const header of headerControls) {
+        TrackScanner.#injectHeaderButtonIfReady(header, queueInstance);
       }
     }
 
@@ -433,6 +461,24 @@
       if (button && DOMMetadataExtractor.extract(container)) {
         // Successfully created button and track metadata is valid -> bind click handlers
         DownloadButton.bind(button, () => DOMMetadataExtractor.extract(container), queueInstance);
+      }
+    }
+
+    static #injectHeaderButtonIfReady(headerContainer, queueInstance) {
+      if (headerContainer.classList.contains("_yamusic_ready_header") || !headerContainer) {
+        return;
+      }
+      headerContainer.classList.add("_yamusic_ready_header");
+
+      const button = DownloadButton.createHeader(headerContainer);
+      if (button) {
+        // Simple click handler for the Download All button placeholder
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          event.preventDefault();
+
+          console.log("Album/playlist download triggered! (Will implement later)");
+        });
       }
     }
   }

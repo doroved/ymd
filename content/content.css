@@ -1,1 +1,49 @@
-.button_transparent{margin-left:-5px}.d-track__title{padding-left:5px;margin-top:3px}.d-track__version.deco-typo-secondary{margin-top:3px}.d-track__meta{padding-top:4px!important}.d-link.deco-link.track__title{padding-left:10px!important}.track.track_type_player{height:52px!important}.lightlist__cont{padding-bottom:0!important}._yamusic_save_next{width:24px;height:24px;opacity:.9;vertical-align:top;overflow:hidden;transition:color .2s;cursor:pointer}._yamusic_save_next:hover{opacity:1}
+.button_transparent{margin-left:-5px}.d-track__title{padding-left:5px;margin-top:3px}.d-track__version.deco-typo-secondary{margin-top:3px}.d-track__meta{padding-top:4px!important}.d-link.deco-link.track__title{padding-left:10px!important}.track.track_type_player{height:52px!important}.lightlist__cont{padding-bottom:0!important}
+
+/* Yellow Circular Download Button */
+._yamusic_save_next {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  background-color: #ffe600;
+  color: #000;
+  padding: 0;
+  margin: 0;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+._yamusic_save_next:hover {
+  background-color: #fff000;
+  transform: scale(1.08);
+}
+
+._yamusic_save_next:active {
+  transform: scale(0.95);
+  background-color: #ebd300;
+}
+
+._yamusic_save_next svg {
+  display: block;
+}
+
+/* Adjust size for the "Download All" button in the album/playlist headers */
+div[class*="controls"] ._yamusic_save_next,
+div[class*="mainControls"] ._yamusic_save_next,
+div[class*="PageHeaderBase_controls"] ._yamusic_save_next {
+  width: 40px;
+  height: 40px;
+  margin-left: 12px;
+}
+
+div[class*="controls"] ._yamusic_save_next svg,
+div[class*="mainControls"] ._yamusic_save_next svg,
+div[class*="PageHeaderBase_controls"] ._yamusic_save_next svg {
+  width: 20px;
+  height: 20px;
+}
