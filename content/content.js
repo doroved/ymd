@@ -140,40 +140,57 @@
     }
 
     /**
-     * Orchestrates track download: gets API metadata, signs request, fetches MP3, gets cover, writes ID3 tags, saves file.
+     * Orchestrates enqueued track download process
      */
     async #processDownload(buttonElement, trackId, fallbackPosition) {
+      try {
+        await this.downloadTrack(trackId, fallbackPosition);
+      } catch (err) {
+        console.error(`Download process failed for track ${trackId}:`, err);
+      } finally {
+        this.#activeCount -= 1;
+        this.#onDownloadComplete(trackId);
+      }
+    }
+
+    /**
+     * Orchestrates track download: gets API metadata, signs request, fetches MP3, gets cover, writes ID3 tags, saves file.
+     */
+    async downloadTrack(trackId, fallbackPosition, preFetchedMetadata = null) {
       const config = await StorageHelper.get(["quality", "tags", "folder", "path", "position", "cover"]);
       const quality = config.quality || "hq";
       const coverSize = config.cover || "400x400";
 
       try {
-        // 1. Fetch precise metadata via official api.music.yandex.ru/tracks.
-        // Doing the fetch directly in the Content Script context automatically inherits
-        // the user's authorized session cookies (like Session_id) for same-site API requests.
-        const metadataUrl = "https://api.music.yandex.ru/tracks";
-        const metadataBody = `trackIds=${trackId}&removeDuplicates=false&withProgress=true`;
+        let trackData = preFetchedMetadata;
+        if (!trackData) {
+          // Fetch precise metadata via official api.music.yandex.ru/tracks.
+          // Doing the fetch directly in the Content Script context automatically inherits
+          // the user's authorized session cookies (like Session_id) for same-site API requests.
+          const metadataUrl = "https://api.music.yandex.ru/tracks";
+          const metadataBody = `trackIds=${trackId}&removeDuplicates=false&withProgress=true`;
 
-        const apiResponse = await fetch(metadataUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "x-yandex-music-client": "YandexMusicWebNext/1.0.0",
-            "x-yandex-music-without-invocation-info": "1",
-            "X-Requested-With": "XMLHttpRequest"
-          },
-          credentials: "include",
-          body: metadataBody
-        }).then(res => res.json()).catch(err => {
-          console.error("Direct metadata fetch error:", err);
-          return null;
-        });
+          const apiResponse = await fetch(metadataUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              "x-yandex-music-client": "YandexMusicWebNext/1.0.0",
+              "x-yandex-music-without-invocation-info": "1",
+              "X-Requested-With": "XMLHttpRequest"
+            },
+            credentials: "include",
+            body: metadataBody
+          }).then(res => res.json()).catch(err => {
+            console.error("Direct metadata fetch error:", err);
+            return null;
+          });
 
-        if (!apiResponse || !Array.isArray(apiResponse) || apiResponse.length === 0) {
-          throw new Error(`Failed to fetch API metadata for track ${trackId}`);
+          if (!apiResponse || !Array.isArray(apiResponse) || apiResponse.length === 0) {
+            throw new Error(`Failed to fetch API metadata for track ${trackId}`);
+          }
+
+          trackData = apiResponse[0];
         }
-
-        const trackData = apiResponse[0];
 
         const title = trackData.title || "Unknown Track";
         const artist = Array.isArray(trackData.artists)
@@ -297,11 +314,11 @@
         const cleanFilename = PathSanitizer.sanitize(`${artist} - ${title}.mp3`);
         const structuredFilename = this.#formatFilename(cleanFilename, position, config);
 
-        this.#triggerSystemDownload(writer.getURL(), structuredFilename, trackId);
+        await this.#triggerSystemDownload(writer.getURL(), structuredFilename);
 
       } catch (err) {
         console.error(`Download process failed for track ${trackId}:`, err);
-        this.#onDownloadComplete(trackId);
+        throw err;
       }
     }
 
@@ -313,16 +330,15 @@
       return `${positionPrefix}${filename}`;
     }
 
-    #triggerSystemDownload(blobUrl, filename, trackId) {
-      browserApi.runtime.sendMessage({
-        message: "download",
-        url: blobUrl,
-        filename: filename
-      }, (response) => {
-        if (response?.status === "done") {
-          this.#activeCount -= 1;
-          this.#onDownloadComplete(trackId);
-        }
+    #triggerSystemDownload(blobUrl, filename) {
+      return new Promise((resolve) => {
+        browserApi.runtime.sendMessage({
+          message: "download",
+          url: blobUrl,
+          filename: filename
+        }, (response) => {
+          resolve(response);
+        });
       });
     }
 
@@ -332,6 +348,71 @@
         const nextItem = this.#queue.shift();
         this.enqueue(...nextItem);
       }
+    }
+
+    /**
+     * Downloads an entire playlist/album sequentially with a 1000ms delay between tasks to prevent CAPTCHAs.
+     */
+    async downloadBulk(tracks, progressCallback) {
+      const trackIds = tracks.map(t => t.trackId);
+      const batchSize = 150;
+      let allMetadata = [];
+
+      for (let i = 0; i < trackIds.length; i += batchSize) {
+        const batchIds = trackIds.slice(i, i + batchSize);
+        const metadataUrl = "https://api.music.yandex.ru/tracks";
+        const metadataBody = `trackIds=${batchIds.join(",")}&removeDuplicates=false&withProgress=true`;
+
+        try {
+          const apiResponse = await fetch(metadataUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              "x-yandex-music-client": "YandexMusicWebNext/1.0.0",
+              "x-yandex-music-without-invocation-info": "1",
+              "X-Requested-With": "XMLHttpRequest"
+            },
+            credentials: "include",
+            body: metadataBody
+          }).then(res => res.json());
+
+          if (Array.isArray(apiResponse)) {
+            allMetadata = allMetadata.concat(apiResponse);
+          }
+        } catch (err) {
+          console.error("Bulk metadata fetch batch error:", err);
+        }
+      }
+
+      const metadataMap = new Map();
+      allMetadata.forEach(trackData => {
+        if (trackData && trackData.id) {
+          metadataMap.set(String(trackData.id), trackData);
+        }
+      });
+
+      let downloadedCount = 0;
+      for (let i = 0; i < tracks.length; i++) {
+        const item = tracks[i];
+        const trackData = metadataMap.get(String(item.trackId));
+
+        if (progressCallback) {
+          progressCallback(downloadedCount + 1, tracks.length, trackData?.title || "Unknown");
+        }
+
+        try {
+          await this.downloadTrack(item.trackId, item.position, trackData);
+          downloadedCount++;
+        } catch (e) {
+          console.error(`Failed to download bulk track ${item.trackId}:`, e);
+        }
+
+        if (i < tracks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      return downloadedCount;
     }
   }
 
@@ -419,6 +500,140 @@
         });
       });
     }
+
+    /**
+     * Binds click event handler on header download button to orchestrate iframe loading,
+     * stable tracks rendering, parsing, metadata gathering, and sequential download.
+     */
+    static bindHeader(buttonElement, queueInstance) {
+      buttonElement.addEventListener("click", async function(event) {
+        event.stopPropagation();
+        event.preventDefault();
+
+        if (this.alreadyRunning) {
+          return;
+        }
+        this.alreadyRunning = true;
+
+        const originalHTML = this.innerHTML;
+        const originalTitle = this.title;
+
+        const updateStatus = (text, isProgress = true) => {
+          if (isProgress) {
+            this.classList.add("_downloading");
+            this.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span>${text}</span>`;
+          } else {
+            this.innerHTML = originalHTML;
+            this.title = originalTitle;
+            this.classList.remove("_downloading");
+          }
+        };
+
+        try {
+          updateStatus("Загрузка...");
+
+          const url = window.location.href;
+          if (!url.includes('/playlists/') && !url.includes('/album/')) {
+            alert('Пожалуйста, запустите на странице плейлиста или альбома');
+            updateStatus("", false);
+            this.alreadyRunning = false;
+            return;
+          }
+
+          // 1. Create hidden iframe with massive height to load all lazy track elements
+          const iframe = document.createElement("iframe");
+          iframe.src = url;
+          iframe.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100000px;border:none;z-index:99999;visibility:hidden;pointer-events:none;";
+          document.body.appendChild(iframe);
+
+          // 2. Wait for iframe onload
+          await new Promise(resolve => {
+            iframe.onload = resolve;
+            setTimeout(resolve, 15000); // 15s max fallback timeout
+          });
+
+          updateStatus("Анализ...");
+
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (!iframeDoc) {
+            throw new Error("No access to iframe document");
+          }
+
+          // 3. Wait for track elements to stabilize in the iframe
+          let lastCount = 0;
+          let stableCount = 0;
+          let attempts = 0;
+          const maxAttempts = 15;
+          const trackSelector = '.d-track, .track, div[class*="Track_root"]';
+
+          while (stableCount < 3 && attempts < maxAttempts) {
+            const currentCount = iframeDoc.querySelectorAll(trackSelector).length;
+            if (currentCount === lastCount && currentCount > 0) {
+              stableCount++;
+            } else {
+              stableCount = 0;
+              lastCount = currentCount;
+            }
+            attempts++;
+            await new Promise(r => setTimeout(r, 1000));
+          }
+
+          const trackElements = iframeDoc.querySelectorAll(trackSelector);
+          if (trackElements.length === 0) {
+            iframe.remove();
+            alert("Не удалось найти треки на странице. Убедитесь, что страница загрузилась полностью.");
+            updateStatus("", false);
+            this.alreadyRunning = false;
+            return;
+          }
+
+          // 4. Parse track IDs
+          const collectedTracks = [];
+          trackElements.forEach((el, idx) => {
+            const meta = DOMMetadataExtractor.extract(el);
+            if (meta && meta.trackId) {
+              collectedTracks.push({
+                trackId: meta.trackId,
+                position: meta.position || (idx + 1)
+              });
+            }
+          });
+
+          // Remove the iframe as we don't need it anymore
+          iframe.remove();
+
+          if (collectedTracks.length === 0) {
+            alert("Не удалось извлечь идентификаторы треков.");
+            updateStatus("", false);
+            this.alreadyRunning = false;
+            return;
+          }
+
+          updateStatus("Метаданные...");
+
+          // 5. Trigger bulk download via sequential queue
+          await queueInstance.downloadBulk(collectedTracks, (current, total, title) => {
+            updateStatus(`${current}/${total}`);
+            this.title = `Скачивание: ${title} (${current} из ${total})`;
+          });
+
+          // Show Success state
+          this.classList.add("_downloading");
+          this.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>Готово!</span>`;
+
+          setTimeout(() => {
+            updateStatus("", false);
+            this.alreadyRunning = false;
+          }, 3000);
+
+        } catch (err) {
+          console.error("Bulk download failed:", err);
+          alert(`Ошибка при скачивании плейлиста/альбома: ${err.message || err}`);
+          updateStatus("", false);
+          this.alreadyRunning = false;
+        }
+      });
+    }
   }
 
   /**
@@ -429,7 +644,7 @@
     static #TRACK_SELECTORS = '.d-track, .track, div[class*="Track_root"], section[class*="PlayerBarDesktop_root"]';
 
     // Selectors for playlist/album controls in headers
-    static #HEADER_SELECTOR = 'div[class*="CommonPageHeader_controls__"], div[class*="PageHeaderPlaylist_mainControls__"], div[class*="PageHeaderAlbumControls_controls__"]';
+    static #HEADER_SELECTOR = 'div[class*="CommonPageHeader_controls__"], div[class*="PageHeaderPlaylist_mainControls__"], div[class*="PageHeaderAlbumControls_controls__"], div[class*="PageHeaderBase_controls__"]';
 
     static scan(queueInstance) {
       // 1. Scan tracks
@@ -472,13 +687,7 @@
 
       const button = DownloadButton.createHeader(headerContainer);
       if (button) {
-        // Simple click handler for the Download All button placeholder
-        button.addEventListener("click", (event) => {
-          event.stopPropagation();
-          event.preventDefault();
-
-          console.log("Album/playlist download triggered! (Will implement later)");
-        });
+        DownloadButton.bindHeader(button, queueInstance);
       }
     }
   }
