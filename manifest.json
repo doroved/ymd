@@ -1,0 +1,84 @@
+{
+  "manifest_version": 3,
+  "name": "YandexMusicDownloader - Скачать музыку",
+  "short_name": "Яндекс Музыка",
+  "description": "Скачивайте любые треки с Яндекс.Музыка в высоком качестве. Просто и удобно!",
+  "version": "0.1.0",
+  "minimum_chrome_version": "109",
+  "incognito": "not_allowed",
+
+  "background": {
+    "service_worker": "sw.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "*://music.yandex.ru/*",
+        "*://*.music.yandex.ru/*",
+        "*://music.yandex.com/*",
+        "*://*.music.yandex.com/*",
+        "*://music.yandex.kz/*",
+        "*://*.music.yandex.kz/*",
+        "*://music.yandex.uz/*",
+        "*://*.music.yandex.uz/*",
+        "*://music.yandex.by/*",
+        "*://*.music.yandex.by/*"
+      ],
+      "css": ["content/content.css"],
+      "js": ["content/tag.js", "content/content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+
+  "action": {
+    "default_icon": "images/icon_128.png",
+    "default_title": "YandexMusicDownloader"
+  },
+
+  "options_page": "options/options.html",
+  "options_ui": {
+    "page": "options/options.html"
+  },
+
+  "icons": {
+    "16": "images/icon_16.png",
+    "32": "images/icon_32.png",
+    "48": "images/icon_48.png",
+    "128": "images/icon_128.png"
+  },
+
+  "permissions": ["storage", "downloads"],
+
+  "host_permissions": [
+    "*://music.yandex.ru/*",
+    "*://*.music.yandex.ru/*",
+    "*://music.yandex.com/*",
+    "*://*.music.yandex.com/*",
+    "*://music.yandex.kz/*",
+    "*://*.music.yandex.kz/*",
+    "*://music.yandex.uz/*",
+    "*://*.music.yandex.uz/*",
+    "*://music.yandex.by/*",
+    "*://*.music.yandex.by/*"
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["images/*"],
+      "matches": [
+        "*://music.yandex.ru/*",
+        "*://*.music.yandex.ru/*",
+        "*://music.yandex.com/*",
+        "*://*.music.yandex.com/*",
+        "*://music.yandex.kz/*",
+        "*://*.music.yandex.kz/*",
+        "*://music.yandex.uz/*",
+        "*://*.music.yandex.uz/*",
+        "*://music.yandex.by/*",
+        "*://*.music.yandex.by/*"
+      ]
+    }
+  ]
+}

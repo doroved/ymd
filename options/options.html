@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>YandexMusicDownloader - скачать музыку</title>
+        <script type="text/javascript" src="options.js" defer="defer"></script>
+        <link type="text/css" rel="stylesheet" href="options.css" />
+    </head>
+    <body>
+        <p>
+            <label for="cover"
+                ><input
+                    class="settings"
+                    type="image"
+                    id="coverIcon"
+                    src='data:image/svg+xml,
+				<svg xmlns="http://www.w3.org/2000/svg" height="20" width="20">
+					<circle cx="10" cy="15" r="3" stroke="black" stroke-width="3" fill="black" />
+				</svg>' />
+                <span id="labelCover">Размер обложки аудиофайла</span>
+                <select id="coverSize">
+                    <option value="400x400" selected="selected">400x400</option>
+                    <option value="600x600">600x600</option>
+                    <option value="800x800">800x800</option>
+                    <option value="1000x1000">1000x1000</option></select
+                ><br
+            /></label>
+        </p>
+        <p>
+            <label for="quality"
+                ><input
+                    class="settings"
+                    type="image"
+                    id="qualityIcon"
+                    src='data:image/svg+xml,
+				<svg xmlns="http://www.w3.org/2000/svg" height="20" width="20">
+					<circle cx="10" cy="15" r="3" stroke="black" stroke-width="3" fill="black" />
+				</svg>' />
+                <span id="bitrate">Битрейт аудиофайлов</span>
+                <select id="bitrateQuality">
+                    <option value="lq" selected="selected">192 kbps</option>
+                    <option value="hq">320 kbps</option></select
+                ><br
+            /></label>
+        </p>
+        <p>
+            <label for="displayAllButton" style="display: none; height: 0"
+                ><input
+                    class="settings"
+                    type="checkbox"
+                    id="displayAllButton" />
+                <span id="labelDisplayAllButton"
+                    >Отображать кнопку «Скачать все аудиозаписи»</span
+                ><br
+            /></label>
+        </p>
+        <p>
+            <label for="tags"
+                ><input class="settings" type="checkbox" id="tags" />
+                <span id="labelTags">Скачивать аудиофайлы с тегами</span><br
+            /></label>
+        </p>
+        <p>
+            <label for="position"
+                ><input class="settings" type="checkbox" id="position" />
+                <span id="labelNumbers"
+                    >Добавлять номер трека в название аудиофайла</span
+                ><br
+            /></label>
+        </p>
+        <p>
+            <label for="userFolder"
+                ><input class="settings" type="checkbox" id="userFolder" />
+                <span id="labelUserFolder"
+                    >Сохранять аудиофайлы в выбранную папку</span
+                >
+                <div id="folder">
+                    <span class="lable-long">Название папки</span>
+                    <input
+                        type="text"
+                        id="folderName"
+                        size="20"
+                        placeholder="например: music"
+                    /></div
+            ></label>
+        </p>
+        <span id="rules"
+            >Подробная информация по
+            <a href="https://YandexMusicDownloader/chrome.html" target="_blank"
+                >настройкам расширения</a
+            >.</span
+        >
+        <span id="support"
+            >Техническая поддержка: support@YandexMusicDownloader</span
+        >
+    </body>
+</html>
