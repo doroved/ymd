@@ -61,7 +61,7 @@ chrome.action.onClicked.addListener(() => {
 // Setup listeners on startup and installation
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === "install") {
-    tabs.create({ url: "https://music.yandex.ru" });
+    tabs.create({ url: chrome.runtime.getURL("welcome/welcome.html") });
   }
   await initDefaultConfig();
 });
