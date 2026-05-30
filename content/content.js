@@ -78,7 +78,7 @@
     const year = albumData?.year || "";
     const position = albumData?.trackPosition?.index || fallbackPosition;
     const genre = albumData?.genre || "";
-    const publisher = albumData?.labels?.[0]?.name || "";
+    const publisher = albumData?.labels?.map(l => l.name).join(", ") || "";
 
     const trackNumber = albumData?.trackPosition
       ? `${albumData.trackPosition.index}/${albumData.trackCount}`
