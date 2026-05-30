@@ -40,7 +40,7 @@ const initDefaultConfig = async () => {
   const defaults = {
     quality: "hq",     // Default to high quality (hq = 320kbps, lq = 128kbps)
     tags: true,        // Save ID3 tags (artwork, title, artists, album)
-    folder: false,     // Save to subfolders
+    folder: true,      // Save to subfolders (структурирование по умолчанию включено!)
     path: "YandexMusic", // Subfolder name
     position: false,   // Prefix filename with track list position
     cover: "400x400"   // Cover image resolution

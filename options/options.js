@@ -21,6 +21,27 @@
   /**
    * Refreshes the options UI state based on values stored in local storage
    */
+  function updateSchema(folderName) {
+    const name = (folderName || "YandexMusic").trim();
+    const schemaElement = document.getElementById("folderSchema");
+    if (!schemaElement) return;
+
+    const useIndex = elements.positionCheckbox ? elements.positionCheckbox.checked : false;
+    const indexPrefix = useIndex ? "[Индекс]. " : "";
+
+    schemaElement.textContent =
+`Downloads/
+└── ${name}/
+    ├── tracks/ (одиночные файлы)
+    │   └── Исполнитель - Трек.mp3
+    ├── albums/
+    │   └── Название Альбома/
+    │       └── ${indexPrefix}Исполнитель - Трек.mp3
+    └── playlists/
+        └── Название Плейлиста/
+            └── ${indexPrefix}Исполнитель - Трек.mp3`;
+  }
+
   function refreshUI() {
     browserApi.storage.local.get(
       ["quality", "tags", "folder", "path", "position", "cover"],
@@ -35,6 +56,7 @@
         if (config.folder === true) {
           elements.folderNameInput.value = config.path || "";
           elements.folderContainer.style.display = "flex";
+          updateSchema(config.path);
         } else {
           elements.folderContainer.style.display = "none";
         }
@@ -59,7 +81,9 @@
     });
 
     elements.positionCheckbox.addEventListener("change", () => {
-      browserApi.storage.local.set({ position: elements.positionCheckbox.checked });
+      browserApi.storage.local.set({ position: elements.positionCheckbox.checked }, () => {
+        updateSchema(elements.folderNameInput.value);
+      });
     });
 
     elements.userFolderCheckbox.addEventListener("change", () => {
@@ -71,17 +95,23 @@
     // Sanitize subfolder name to only allow safe alphanumeric and hyphen/underscore characters
     elements.folderNameInput.addEventListener("input", () => {
       const sanitizedPath = elements.folderNameInput.value.replace(/[^a-z0-9A-Zа-яА-Я\-_]/gi, "");
-      browserApi.storage.local.set({ path: sanitizedPath });
+      browserApi.storage.local.set({ path: sanitizedPath }, () => {
+        updateSchema(sanitizedPath);
+      });
     });
   }
 
   // Initialize page configuration
-  browserApi.storage.local.get("path", (config) => {
-    if (!config.path || config.path.length === 0) {
-      browserApi.storage.local.set({ folder: false, path: "" });
+  browserApi.storage.local.get(["path", "folder"], (config) => {
+    if (config.path === undefined) {
+      browserApi.storage.local.set({ folder: true, path: "YandexMusic" }, () => {
+        refreshUI();
+        updateSchema("YandexMusic");
+      });
+    } else {
+      refreshUI();
+      updateSchema(config.path);
     }
-
-    refreshUI();
     bindEventHandlers();
   });
 })();

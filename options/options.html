@@ -130,8 +130,9 @@
                         <div class="setting-info">
                             <span class="setting-name">Индексация треков</span>
                             <span class="setting-desc"
-                                >Добавлять порядковый номер в название
-                                MP3-файла</span
+                                >Добавлять порядковый номер в название MP3-файла
+                                (только при скачивании плейлиста или
+                                альбома)</span
                             >
                         </div>
                         <div class="setting-control">
@@ -145,11 +146,11 @@
                     <div class="setting-row border-top">
                         <div class="setting-info">
                             <span class="setting-name"
-                                >Выделенная папка загрузок</span
+                                >Структурировать библиотеку</span
                             >
                             <span class="setting-desc"
-                                >Сохранять все скачанные треки в отдельную
-                                поддиректорию</span
+                                >Автоматически распределять треки, плейлисты и
+                                альбомы по отдельным папкам</span
                             >
                         </div>
                         <div class="setting-control">
@@ -160,24 +161,44 @@
                         </div>
                     </div>
 
-                    <div id="folder" class="setting-sub-row hidden">
-                        <div class="setting-info">
-                            <span class="setting-name">Имя поддиректории</span>
-                            <span class="setting-desc"
-                                >Папка будет создана внутри вашей стандартной
-                                директории загрузок. Одиночные треки сохраняются
-                                в <b>[Имя]/tracks</b>, плейлисты — в
-                                <b>[Имя]/playlists/[Название]</b>, альбомы — в
-                                <b>[Имя]/albums/[Название]</b>.</span
-                            >
+                    <div
+                        id="folder"
+                        class="setting-sub-row hidden"
+                        style="
+                            flex-direction: column;
+                            align-items: stretch;
+                            gap: 12px;
+                        "
+                    >
+                        <div
+                            style="
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: center;
+                                gap: 20px;
+                            "
+                        >
+                            <div class="setting-info">
+                                <span class="setting-name"
+                                    >Название корневой папки</span
+                                >
+                                <span class="setting-desc"
+                                    >Главная папка в системной директории
+                                    «Загрузки», внутри которой будет создана
+                                    структура медиатеки</span
+                                >
+                            </div>
+                            <div class="setting-control">
+                                <input
+                                    type="text"
+                                    id="folderName"
+                                    class="custom-input"
+                                    placeholder="например: YandexMusic"
+                                />
+                            </div>
                         </div>
-                        <div class="setting-control">
-                            <input
-                                type="text"
-                                id="folderName"
-                                class="custom-input"
-                                placeholder="например: YandexMusic"
-                            />
+                        <div class="folder-schema-container">
+                            <pre id="folderSchema" class="folder-schema"></pre>
                         </div>
                     </div>
                 </section>

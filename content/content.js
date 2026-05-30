@@ -116,7 +116,7 @@
 
     // Sanitize file and directory paths
     const cleanFilename = `${artist} - ${title}`.replace(/[?:;"<>\/\\|*]|^\s+|[\u200B-\u200D\uFEFF]/gi, char => char === " " ? "" : "_") + ".mp3";
-    const positionPrefix = (config.position === true && position > 0) ? `${position}. ` : "";
+    const positionPrefix = (config.position === true && bulkContext && position > 0) ? `${position}. ` : "";
 
     let finalFolder = "";
     if (config.folder === true && config.path) {
