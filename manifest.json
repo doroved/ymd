@@ -12,19 +12,24 @@
     "service_worker": "sw.js"
   },
 
+  "permissions": ["storage", "downloads"],
+
+  "host_permissions": [
+    "*://api.music.yandex.ru/*",
+    "*://api.music.yandex.by/*",
+    "*://api.music.yandex.kz/*",
+    "*://api.music.yandex.uz/*",
+    "*://api.music.yandex.com/*"
+  ],
+
   "content_scripts": [
     {
       "matches": [
         "*://music.yandex.ru/*",
-        "*://*.music.yandex.ru/*",
-        "*://music.yandex.com/*",
-        "*://*.music.yandex.com/*",
-        "*://music.yandex.kz/*",
-        "*://*.music.yandex.kz/*",
-        "*://music.yandex.uz/*",
-        "*://*.music.yandex.uz/*",
         "*://music.yandex.by/*",
-        "*://*.music.yandex.by/*"
+        "*://music.yandex.kz/*",
+        "*://music.yandex.uz/*",
+        "*://music.yandex.com/*"
       ],
       "css": ["content/content.css"],
       "js": ["content/tag.js", "content/content.js"],
@@ -41,38 +46,5 @@
   "options_ui": {
     "page": "options/options.html",
     "open_in_tab": true
-  },
-
-  "permissions": ["storage", "downloads"],
-
-  "host_permissions": [
-    "*://music.yandex.ru/*",
-    "*://*.music.yandex.ru/*",
-    "*://music.yandex.com/*",
-    "*://*.music.yandex.com/*",
-    "*://music.yandex.kz/*",
-    "*://*.music.yandex.kz/*",
-    "*://music.yandex.uz/*",
-    "*://*.music.yandex.uz/*",
-    "*://music.yandex.by/*",
-    "*://*.music.yandex.by/*"
-  ],
-
-  "web_accessible_resources": [
-    {
-      "resources": ["images/*"],
-      "matches": [
-        "*://music.yandex.ru/*",
-        "*://*.music.yandex.ru/*",
-        "*://music.yandex.com/*",
-        "*://*.music.yandex.com/*",
-        "*://music.yandex.kz/*",
-        "*://*.music.yandex.kz/*",
-        "*://music.yandex.uz/*",
-        "*://*.music.yandex.uz/*",
-        "*://music.yandex.by/*",
-        "*://*.music.yandex.by/*"
-      ]
-    }
-  ]
+  }
 }
