@@ -22,7 +22,7 @@
    * Refreshes the options UI state based on values stored in local storage
    */
   function updateSchema(folderName) {
-    const name = (folderName || "YandexMusic").trim();
+    const name = (folderName || "YMDownloader").trim();
     const schemaElement = document.getElementById("folderSchema");
     if (!schemaElement) return;
 
@@ -104,9 +104,9 @@
   // Initialize page configuration
   browserApi.storage.local.get(["path", "folder", "position"], (config) => {
     if (config.path === undefined) {
-      browserApi.storage.local.set({ folder: true, path: "YandexMusic", position: true }, () => {
+      browserApi.storage.local.set({ folder: true, path: "YMDownloader", position: true }, () => {
         refreshUI();
-        updateSchema("YandexMusic");
+        updateSchema("YMDownloader");
       });
     } else {
       refreshUI();
