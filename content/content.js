@@ -59,7 +59,7 @@
   /**
    * Downloads a single track: gets metadata, signs URL, tags ID3, and saves file
    */
-  const downloadTrack = async (trackId, fallbackPosition, preFetchedMetadata = null) => {
+  const downloadTrack = async (trackId, fallbackPosition, preFetchedMetadata = null, bulkContext = null) => {
     const config = await chrome.storage.local.get(["quality", "tags", "folder", "path", "position", "cover"]);
     const quality = config.quality || "hq";
     const coverSize = config.cover || "400x400";
@@ -117,9 +117,23 @@
     // Sanitize file and directory paths
     const cleanFilename = `${artist} - ${title}`.replace(/[?:;"<>\/\\|*]|^\s+|[\u200B-\u200D\uFEFF]/gi, char => char === " " ? "" : "_") + ".mp3";
     const positionPrefix = (config.position === true && position > 0) ? `${position}. ` : "";
-    const filename = (config.folder === true && config.path)
-      ? `${config.path}/${positionPrefix}${cleanFilename}`
-      : `${positionPrefix}${cleanFilename}`;
+
+    let finalFolder = "";
+    if (config.folder === true && config.path) {
+      const basePath = config.path.trim().replace(/[?:;"<>\/\\|*]/gi, "_");
+      if (bulkContext) {
+        const cleanContextTitle = bulkContext.title.trim().replace(/[?:;"<>\/\\|*]/gi, "_");
+        if (bulkContext.type === "playlist") {
+          finalFolder = `${basePath}/playlists/${cleanContextTitle}/`;
+        } else if (bulkContext.type === "album") {
+          finalFolder = `${basePath}/albums/${cleanContextTitle}/`;
+        }
+      } else {
+        finalFolder = `${basePath}/tracks/`;
+      }
+    }
+
+    const filename = `${finalFolder}${positionPrefix}${cleanFilename}`;
 
     return new Promise((resolve) => {
       chrome.runtime.sendMessage({ message: "download", url: writer.getURL(), filename }, resolve);
@@ -159,7 +173,7 @@
       const item = tracks[i];
       if (progressCallback) progressCallback(i + 1, tracks.length, item.trackData?.title || "Unknown");
       try {
-        await downloadTrack(item.trackId, item.position, item.trackData);
+        await downloadTrack(item.trackId, item.position, item.trackData, item.bulkContext);
       } catch (e) {
         console.error(e);
       }
@@ -194,10 +208,12 @@
       }).then(r => r.json()).catch(() => null);
 
       if (res?.result?.tracks) {
+        const playlistTitle = res.result.title || "Unknown Playlist";
         return res.result.tracks.map((t, idx) => ({
           trackId: t.track.id,
           position: idx + 1,
-          trackData: t.track
+          trackData: t.track,
+          bulkContext: { type: "playlist", title: playlistTitle }
         }));
       }
     }
@@ -212,10 +228,12 @@
       }).then(r => r.json()).catch(() => null);
 
       if (res?.result?.tracks) {
+        const playlistTitle = res.result.title || "Unknown Playlist";
         return res.result.tracks.map((t, idx) => ({
           trackId: t.track.id,
           position: idx + 1,
-          trackData: t.track
+          trackData: t.track,
+          bulkContext: { type: "playlist", title: playlistTitle }
         }));
       }
     }
@@ -229,6 +247,7 @@
       }).then(r => r.json()).catch(() => null);
 
       if (res?.result?.volumes) {
+        const albumTitle = res.result.title || "Unknown Album";
         const tracks = [];
         let position = 1;
         res.result.volumes.forEach(volume => {
@@ -237,7 +256,8 @@
               tracks.push({
                 trackId: t.id,
                 position: position++,
-                trackData: t
+                trackData: t,
+                bulkContext: { type: "album", title: albumTitle }
               });
             });
           }
