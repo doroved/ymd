@@ -104,7 +104,7 @@
   // Initialize page configuration
   browserApi.storage.local.get(["path", "folder", "position"], (config) => {
     if (config.path === undefined) {
-      browserApi.storage.local.set({ folder: true, path: "YMDownloader", position: true }, () => {
+      browserApi.storage.local.set({ folder: false, path: "YMDownloader", position: false }, () => {
         refreshUI();
         updateSchema("YMDownloader");
       });

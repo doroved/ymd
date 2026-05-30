@@ -40,9 +40,9 @@ const initDefaultConfig = async () => {
   const defaults = {
     quality: "hq",     // Default to high quality (hq = 320kbps, lq = 128kbps)
     tags: true,        // Save ID3 tags (artwork, title, artists, album)
-    folder: true,      // Save to subfolders (структурирование по умолчанию включено!)
+    folder: false,     // Save to subfolders (структурирование по умолчанию включено!)
     path: "YMDownloader", // Subfolder name
-    position: true,    // Prefix filename with track list position (индексация по умолчанию включена!)
+    position: false,    // Prefix filename with track list position (индексация по умолчанию включена!)
     cover: "400x400"   // Cover image resolution
   };
 
