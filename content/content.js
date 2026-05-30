@@ -283,7 +283,9 @@
     button.type = "button";
     button.classList.add("_yamusic_save_next");
     button.title = "Скачать";
-    button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>';
+
+    const originalHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>';
+    button.innerHTML = originalHTML;
 
     button.addEventListener("click", async (e) => {
       e.stopPropagation();
@@ -294,12 +296,29 @@
       const meta = extractTrackMeta(container);
       if (meta) {
         try {
+          // 1. Показываем вращающийся лоадер
+          button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>';
+
           await enqueueDownload(meta.trackId, meta.position);
+
+          // 2. Показываем галочку при успехе
+          button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
         } catch (err) {
-          console.error(err);
+          console.error("Download failed for track:", err);
+          button.innerHTML = originalHTML;
+          button.disabled = false;
+          return;
         }
+      } else {
+        button.disabled = false;
+        return;
       }
-      setTimeout(() => button.disabled = false, 1000);
+
+      // 3. Возвращаем исходную иконку через 2 секунды
+      setTimeout(() => {
+        button.innerHTML = originalHTML;
+        button.disabled = false;
+      }, 2000);
     });
 
     controls.insertBefore(button, buttons[0]);

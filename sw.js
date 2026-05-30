@@ -42,7 +42,7 @@ const initDefaultConfig = async () => {
     tags: true,        // Save ID3 tags (artwork, title, artists, album)
     folder: true,      // Save to subfolders (структурирование по умолчанию включено!)
     path: "YandexMusic", // Subfolder name
-    position: false,   // Prefix filename with track list position
+    position: true,    // Prefix filename with track list position (индексация по умолчанию включена!)
     cover: "400x400"   // Cover image resolution
   };
 

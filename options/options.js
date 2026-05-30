@@ -102,9 +102,9 @@
   }
 
   // Initialize page configuration
-  browserApi.storage.local.get(["path", "folder"], (config) => {
+  browserApi.storage.local.get(["path", "folder", "position"], (config) => {
     if (config.path === undefined) {
-      browserApi.storage.local.set({ folder: true, path: "YandexMusic" }, () => {
+      browserApi.storage.local.set({ folder: true, path: "YandexMusic", position: true }, () => {
         refreshUI();
         updateSchema("YandexMusic");
       });
