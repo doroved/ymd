@@ -197,29 +197,10 @@
    * Direct REST API queries for full track playlist/album metadata
    */
   const fetchTracksFromAPI = async () => {
-    const url = window.location.href;
+    const path = window.location.pathname;
 
-    // 1. Playlists by UUID
-    const playlistUuidMatch = url.match(/\/playlists\/([a-f0-9-]+)/i);
-    if (playlistUuidMatch) {
-      const uuid = playlistUuidMatch[1];
-      const res = await fetch(`https://api.music.yandex.ru/playlist/${uuid}?resumeStream=false&richTracks=true`, {
-        credentials: "include"
-      }).then(r => r.json()).catch(() => null);
-
-      if (res?.result?.tracks) {
-        const playlistTitle = res.result.title || "Unknown Playlist";
-        return res.result.tracks.map((t, idx) => ({
-          trackId: t.track.id,
-          position: idx + 1,
-          trackData: t.track,
-          bulkContext: { type: "playlist", title: playlistTitle }
-        }));
-      }
-    }
-
-    // 2. Playlists by User & Kind
-    const playlistUserMatch = url.match(/\/users\/([^/]+)\/playlists\/(\d+)/i);
+    // 1. Playlists by User & Kind (e.g. /users/mts-music/playlists/1460)
+    const playlistUserMatch = path.match(/\/users\/([^/]+)\/playlists\/(\d+)/i);
     if (playlistUserMatch) {
       const user = playlistUserMatch[1];
       const kind = playlistUserMatch[2];
@@ -238,8 +219,27 @@
       }
     }
 
-    // 3. Albums
-    const albumMatch = url.match(/\/album\/(\d+)/i);
+    // 2. Playlists by ID (e.g. /playlists/ar.ce76914c-4acf-4572-9100-a4d399894dc9)
+    const playlistIdMatch = path.match(/\/playlists\/([^/]+)/i);
+    if (playlistIdMatch) {
+      const playlistId = playlistIdMatch[1];
+      const res = await fetch(`https://api.music.yandex.ru/playlist/${playlistId}?resumeStream=false&richTracks=true`, {
+        credentials: "include"
+      }).then(r => r.json()).catch(() => null);
+
+      if (res?.result?.tracks) {
+        const playlistTitle = res.result.title || "Unknown Playlist";
+        return res.result.tracks.map((t, idx) => ({
+          trackId: t.track.id,
+          position: idx + 1,
+          trackData: t.track,
+          bulkContext: { type: "playlist", title: playlistTitle }
+        }));
+      }
+    }
+
+    // 3. Albums (e.g. /album/42104500)
+    const albumMatch = path.match(/\/album\/(\d+)/i);
     if (albumMatch) {
       const albumId = albumMatch[1];
       const res = await fetch(`https://api.music.yandex.ru/albums/${albumId}/with-tracks?resumeStream=false&richTracks=true&withListeningFinished=true`, {
