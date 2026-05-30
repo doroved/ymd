@@ -1,7 +1,6 @@
 /**
- * Yandex Music Downloader - Content Script
- * Экстремально оптимизированная, легковесная и консолидированная реализация.
- * БЕЗ классов, БЕЗ лишнего бойлерплейта, БЕЗ дублирования кода. Чисто функциональный стиль.
+ * Yandex Music Downloader - Content Script (API-based approach)
+ * Extremely fast, reliable, and efficient. No iframes, no DOM scraping.
  */
 
 (() => {
@@ -10,7 +9,7 @@
   const MAX_CONCURRENT = 7;
 
   /**
-   * Хелпер для выполнения запросов к REST API Яндекс Музыки в контексте страницы
+   * Helper to perform Yandex Music REST API requests in the page context
    */
   const apiCall = async (endpoint, body) => {
     return fetch(endpoint, {
@@ -27,7 +26,7 @@
   };
 
   /**
-   * Генерирует подпись и запрашивает прямую ссылку на MP3-поток
+   * Generates signed URL and fetches MP3 download stream URL
    */
   const getStreamUrl = async (trackId, quality) => {
     const timestamp = Math.floor(Date.now() / 1000);
@@ -58,7 +57,7 @@
   };
 
   /**
-   * Скачивает один трек: получает метаданные, подписывает URL, внедряет ID3-теги и сохраняет файл
+   * Downloads a single track: gets metadata, signs URL, tags ID3, and saves file
    */
   const downloadTrack = async (trackId, fallbackPosition, preFetchedMetadata = null) => {
     const config = await chrome.storage.local.get(["quality", "tags", "folder", "path", "position", "cover"]);
@@ -115,7 +114,7 @@
 
     if (config.tags !== false) writer.addTag();
 
-    // Санитизация имен файлов и путей
+    // Sanitize file and directory paths
     const cleanFilename = `${artist} - ${title}`.replace(/[?:;"<>\/\\|*]|^\s+|[\u200B-\u200D\uFEFF]/gi, char => char === " " ? "" : "_") + ".mp3";
     const positionPrefix = (config.position === true && position > 0) ? `${position}. ` : "";
     const filename = (config.folder === true && config.path)
@@ -128,7 +127,7 @@
   };
 
   /**
-   * Управляет очередью загрузок с соблюдением порога многопоточности
+   * Triggers single enqueued download tasks matching the max concurrency threshold
    */
   const processQueue = async () => {
     if (activeDownloads >= MAX_CONCURRENT || queue.length === 0) return;
@@ -153,27 +152,14 @@
   };
 
   /**
-   * Загружает список треков последовательно с задержкой 1000мс для предотвращения капчи/блокировок
+   * Downloads tracks sequentially with a 1000ms delay to prevent DDoS blocks
    */
   const downloadBulk = async (tracks, progressCallback) => {
-    const trackIds = tracks.map(t => t.trackId);
-    const batchSize = 150;
-    let allMetadata = [];
-
-    for (let i = 0; i < trackIds.length; i += batchSize) {
-      const batchIds = trackIds.slice(i, i + batchSize);
-      const apiResponse = await apiCall("https://api.music.yandex.ru/tracks", `trackIds=${batchIds.join(",")}&removeDuplicates=false&withProgress=true`);
-      if (Array.isArray(apiResponse)) allMetadata = allMetadata.concat(apiResponse);
-    }
-
-    const metadataMap = new Map(allMetadata.filter(t => t?.id).map(t => [String(t.id), t]));
-
     for (let i = 0; i < tracks.length; i++) {
       const item = tracks[i];
-      const trackData = metadataMap.get(String(item.trackId));
-      if (progressCallback) progressCallback(i + 1, tracks.length, trackData?.title || "Unknown");
+      if (progressCallback) progressCallback(i + 1, tracks.length, item.trackData?.title || "Unknown");
       try {
-        await downloadTrack(item.trackId, item.position, trackData);
+        await downloadTrack(item.trackId, item.position, item.trackData);
       } catch (e) {
         console.error(e);
       }
@@ -182,7 +168,7 @@
   };
 
   /**
-   * Извлекает идентификаторы треков из DOM-контейнеров
+   * Extracts track identifiers from DOM container elements
    */
   const extractTrackMeta = (el) => {
     const trackLink = el.querySelector('a[href*="/track/"]');
@@ -194,7 +180,77 @@
   };
 
   /**
-   * Внедряет желтую круглую кнопку скачивания в контейнер трека
+   * Direct REST API queries for full track playlist/album metadata
+   */
+  const fetchTracksFromAPI = async () => {
+    const url = window.location.href;
+
+    // 1. Playlists by UUID
+    const playlistUuidMatch = url.match(/\/playlists\/([a-f0-9-]+)/i);
+    if (playlistUuidMatch) {
+      const uuid = playlistUuidMatch[1];
+      const res = await fetch(`https://api.music.yandex.ru/playlist/${uuid}?resumeStream=false&richTracks=true`, {
+        credentials: "include"
+      }).then(r => r.json()).catch(() => null);
+
+      if (res?.result?.tracks) {
+        return res.result.tracks.map((t, idx) => ({
+          trackId: t.track.id,
+          position: idx + 1,
+          trackData: t.track
+        }));
+      }
+    }
+
+    // 2. Playlists by User & Kind
+    const playlistUserMatch = url.match(/\/users\/([^/]+)\/playlists\/(\d+)/i);
+    if (playlistUserMatch) {
+      const user = playlistUserMatch[1];
+      const kind = playlistUserMatch[2];
+      const res = await fetch(`https://api.music.yandex.ru/users/${user}/playlists/${kind}?resumeStream=false&richTracks=true`, {
+        credentials: "include"
+      }).then(r => r.json()).catch(() => null);
+
+      if (res?.result?.tracks) {
+        return res.result.tracks.map((t, idx) => ({
+          trackId: t.track.id,
+          position: idx + 1,
+          trackData: t.track
+        }));
+      }
+    }
+
+    // 3. Albums
+    const albumMatch = url.match(/\/album\/(\d+)/i);
+    if (albumMatch) {
+      const albumId = albumMatch[1];
+      const res = await fetch(`https://api.music.yandex.ru/albums/${albumId}/with-tracks?resumeStream=false&richTracks=true&withListeningFinished=true`, {
+        credentials: "include"
+      }).then(r => r.json()).catch(() => null);
+
+      if (res?.result?.volumes) {
+        const tracks = [];
+        let position = 1;
+        res.result.volumes.forEach(volume => {
+          if (Array.isArray(volume)) {
+            volume.forEach(t => {
+              tracks.push({
+                trackId: t.id,
+                position: position++,
+                trackData: t
+              });
+            });
+          }
+        });
+        return tracks;
+      }
+    }
+
+    return null;
+  };
+
+  /**
+   * Injects yellow circular download button into track container
    */
   const injectTrackButton = (container) => {
     const controls = container.querySelector("div[class*='ControlsBar_root'], div[class*='PlayerBarDesktop_meta']");
@@ -230,10 +286,9 @@
   };
 
   /**
-   * Внедряет кнопку группового скачивания в заголовок плейлиста/альбома
+   * Injects page header download button onto playlist/album pages
    */
   const injectHeaderButton = (container) => {
-    // Делаем глобальную проверку в контейнере, чтобы не дублировать кнопку во вложенных селекторах
     if (container.querySelector("._yamusic_save_next")) return;
 
     const button = document.createElement("button");
@@ -264,61 +319,15 @@
       try {
         updateStatus("Загрузка...");
 
-        const url = window.location.href;
-        if (!url.includes('/playlists/') && !url.includes('/album/')) {
-          alert('Пожалуйста, запустите на странице плейлиста или альбома');
+        const tracks = await fetchTracksFromAPI();
+        if (!tracks || tracks.length === 0) {
+          alert("Не удалось загрузить треки по API. Пожалуйста, убедитесь, что вы авторизованы.");
           updateStatus("", false);
           return;
         }
 
-        const iframe = document.createElement("iframe");
-        iframe.src = url;
-        iframe.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100000px;border:none;z-index:99999;visibility:hidden;pointer-events:none;";
-        document.body.appendChild(iframe);
-
-        await new Promise(resolve => {
-          iframe.onload = resolve;
-          setTimeout(resolve, 15000);
-        });
-
-        updateStatus("Анализ...");
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (!iframeDoc) throw new Error("No access to iframe document");
-
-        let lastCount = 0, stableCount = 0, attempts = 0;
-        const trackSelector = '.d-track, .track, div[class*="Track_root"]';
-
-        while (stableCount < 3 && attempts < 15) {
-          const currentCount = iframeDoc.querySelectorAll(trackSelector).length;
-          if (currentCount === lastCount && currentCount > 0) stableCount++;
-          else { stableCount = 0; lastCount = currentCount; }
-          attempts++;
-          await new Promise(r => setTimeout(r, 1000));
-        }
-
-        const trackElements = iframeDoc.querySelectorAll(trackSelector);
-        if (trackElements.length === 0) {
-          iframe.remove();
-          alert("Не удалось найти треки на странице.");
-          updateStatus("", false);
-          return;
-        }
-
-        const collectedTracks = [];
-        trackElements.forEach((el, idx) => {
-          const meta = extractTrackMeta(el);
-          if (meta) collectedTracks.push({ trackId: meta.trackId, position: meta.position || (idx + 1) });
-        });
-
-        iframe.remove();
-        if (collectedTracks.length === 0) {
-          alert("Не удалось извлечь идентификаторы треков.");
-          updateStatus("", false);
-          return;
-        }
-
-        updateStatus("Метаданные...");
-        await downloadBulk(collectedTracks, (current, total, title) => {
+        updateStatus(`0/${tracks.length}`);
+        await downloadBulk(tracks, (current, total, title) => {
           updateStatus(`${current}/${total}`);
           button.title = `Скачивание: ${title} (${current} из ${total})`;
         });
@@ -334,12 +343,11 @@
       }
     });
 
-    // Вставляем строго в начало контейнера, перед кнопкой "Слушать"
     container.prepend(button);
   };
 
   /**
-   * Сканирует DOM на наличие списков треков и заголовков страниц для внедрения кнопок
+   * Scans DOM for track listings and page headers to inject downloader buttons
    */
   const scan = () => {
     // 1. Одиночные треки
@@ -348,7 +356,7 @@
       injectTrackButton(track);
     });
 
-    // 2. Элементы управления в шапках (строго по CommonPageHeader_controls__ или PageHeaderPlaylist_mainControls)
+    // 2. Элементы управления в шапках плейлистов/альбомов
     const headerSelectors = 'div[class*="CommonPageHeader_controls__"], div[class*="PageHeaderPlaylist_mainControls"]';
 
     const header = document.querySelector(headerSelectors);
