@@ -167,9 +167,14 @@
 
   /**
    * Downloads tracks sequentially with a 1000ms delay to prevent DDoS blocks
+   * Supports cancellation token checking
    */
-  const downloadBulk = async (tracks, progressCallback) => {
+  const downloadBulk = async (tracks, progressCallback, checkCancelled) => {
     for (let i = 0; i < tracks.length; i++) {
+      if (checkCancelled && checkCancelled()) {
+        console.log("Bulk download cancelled by user.");
+        break;
+      }
       const item = tracks[i];
       if (progressCallback) progressCallback(i + 1, tracks.length, item.trackData?.title || "Unknown");
       try {
@@ -177,7 +182,13 @@
       } catch (e) {
         console.error(e);
       }
-      if (i < tracks.length - 1) await new Promise(r => setTimeout(r, 1000));
+      if (i < tracks.length - 1) {
+        // Safe chunked delay of 1000ms with check for cancellation every 100ms
+        for (let delay = 0; delay < 1000; delay += 100) {
+          if (checkCancelled && checkCancelled()) break;
+          await new Promise(r => setTimeout(r, 100));
+        }
+      }
     }
   };
 
@@ -336,29 +347,83 @@
     button.title = "Скачать всё";
     button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>';
 
+    let isDownloading = false;
+    let isFetchingTracks = false;
+    let cancelRequested = false;
+    let currentStatusText = "";
+
+    const originalHTML = button.innerHTML;
+    const originalTitle = button.title;
+
+    const updateStatus = (text, isProgress = true) => {
+      currentStatusText = text;
+      if (isProgress) {
+        button.classList.add("_downloading");
+        isDownloading = true;
+        // Если идет загрузка списка по API или пользователь не навел курсор, обновляем текст прогресса
+        if (isFetchingTracks || !button.matches(':hover')) {
+          button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span>${text}</span>`;
+        }
+      } else {
+        button.innerHTML = originalHTML;
+        button.title = originalTitle;
+        button.classList.remove("_downloading");
+        isDownloading = false;
+        cancelRequested = false;
+        isFetchingTracks = false;
+        button.style.backgroundColor = "";
+        button.style.color = "";
+      }
+    };
+
+    // При наведении показываем возможность отмены
+    button.addEventListener("mouseenter", () => {
+      if (isDownloading && !cancelRequested && !isFetchingTracks) {
+        button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect></svg><span>Прервать?</span>`;
+        button.style.backgroundColor = "#ff4444";
+        button.style.color = "#ffffff";
+        button.title = "Нажмите, чтобы остановить загрузку";
+      }
+    });
+
+    // Возвращаем прогресс при уходе курсора
+    button.addEventListener("mouseleave", () => {
+      if (isDownloading) {
+        button.style.backgroundColor = "";
+        button.style.color = "";
+        if (cancelRequested) {
+          button.innerHTML = `<span>Остановка...</span>`;
+          button.title = "Загрузка останавливается...";
+        } else {
+          const textToShow = isFetchingTracks ? "Загрузка..." : currentStatusText;
+          button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span>${textToShow}</span>`;
+        }
+      }
+    });
+
     button.addEventListener("click", async (e) => {
       e.stopPropagation();
       e.preventDefault();
-      if (button.classList.contains("_downloading")) return;
 
-      const originalHTML = button.innerHTML;
-      const originalTitle = button.title;
-
-      const updateStatus = (text, isProgress = true) => {
-        if (isProgress) {
-          button.classList.add("_downloading");
-          button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span>${text}</span>`;
-        } else {
-          button.innerHTML = originalHTML;
-          button.title = originalTitle;
-          button.classList.remove("_downloading");
+      if (isDownloading) {
+        if (isFetchingTracks) return; // Игнорируем клики во время первичного запроса к API
+        if (confirm("Вы действительно хотите остановить загрузку плейлиста/альбома?")) {
+          cancelRequested = true;
+          button.innerHTML = `<span>Остановка...</span>`;
+          button.style.backgroundColor = "";
+          button.style.color = "";
+          button.title = "Загрузка останавливается...";
         }
-      };
+        return;
+      }
 
       try {
+        isFetchingTracks = true;
         updateStatus("Загрузка...");
 
         const tracks = await fetchTracksFromAPI();
+        isFetchingTracks = false;
+
         if (!tracks || tracks.length === 0) {
           alert("Не удалось загрузить треки по API. Пожалуйста, убедитесь, что вы авторизованы.");
           updateStatus("", false);
@@ -369,13 +434,25 @@
         await downloadBulk(tracks, (current, total, title) => {
           updateStatus(`${current}/${total}`);
           button.title = `Скачивание: ${title} (${current} из ${total})`;
-        });
+        }, () => cancelRequested);
 
-        button.classList.add("_downloading");
-        button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>Готово!</span>`;
-        setTimeout(() => updateStatus("", false), 3000);
+        button.style.backgroundColor = "";
+        button.style.color = "";
+
+        if (cancelRequested) {
+          button.classList.add("_downloading");
+          button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><span>Прервано</span>`;
+          button.title = "Загрузка была остановлена пользователем";
+          setTimeout(() => updateStatus("", false), 2000);
+        } else {
+          button.classList.add("_downloading");
+          button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>Готово!</span>`;
+          setTimeout(() => updateStatus("", false), 3000);
+        }
 
       } catch (err) {
+        button.style.backgroundColor = "";
+        button.style.color = "";
         console.error("Bulk download failed:", err);
         alert(`Ошибка скачивания: ${err.message || err}`);
         updateStatus("", false);

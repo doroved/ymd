@@ -20,7 +20,7 @@
 
 ._yamusic_save_next:hover {
   background-color: #fff000;
-  transform: scale(1.08);
+  transform: scale(1.04);
 }
 
 ._yamusic_save_next:active {
@@ -64,6 +64,10 @@ div[class*="PageHeaderBase_controls"] ._yamusic_save_next svg {
   color: #000;
   background-color: #ffe600;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+._yamusic_save_next._downloading:hover {
+  transform: none !important;
 }
 
 ._yamusic_save_next._downloading span {
