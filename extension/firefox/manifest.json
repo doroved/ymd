@@ -1,19 +1,11 @@
 {
-  "$schema": "https://json.schemastore.org/chrome-manifest",
   "manifest_version": 3,
   "name": "YandexMusicDownloader",
   "short_name": "YMDownloader",
   "description": "Скачивайте любые треки с Яндекс.Музыка в высоком качестве. Просто и удобно!",
   "version": "0.1.0",
-  "minimum_chrome_version": "109",
-  "incognito": "not_allowed",
-
-  "background": {
-    "service_worker": "sw.js"
-  },
-
+  "homepage_url": "https://github.com/doroved/ymd",
   "permissions": ["storage", "downloads"],
-
   "host_permissions": [
     "*://api.music.yandex.ru/*",
     "*://api.music.yandex.by/*",
@@ -21,9 +13,29 @@
     "*://api.music.yandex.uz/*",
     "*://api.music.yandex.com/*"
   ],
-
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ymd@doroved.com",
+      "strict_min_version": "109.0"
+    }
+  },
+  "background": {
+    "scripts": ["src/sw.js"]
+  },
+  "action": {
+    "default_title": "YandexMusicDownloader"
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
   "content_scripts": [
     {
+      "all_frames": true,
+      "css": ["src/content.css"],
+      "js": ["src/tag.js", "src/content.js"],
       "matches": [
         "*://music.yandex.ru/*",
         "*://music.yandex.by/*",
@@ -31,20 +43,13 @@
         "*://music.yandex.uz/*",
         "*://music.yandex.com/*"
       ],
-      "css": ["content/content.css"],
-      "js": ["content/tag.js", "content/content.js"],
-      "run_at": "document_start",
-      "all_frames": true
+      "run_at": "document_start"
     }
   ],
-
-  "action": {
-    "default_title": "YandexMusicDownloader"
-  },
-
   "options_page": "options/options.html",
   "options_ui": {
-    "page": "options/options.html",
-    "open_in_tab": true
-  }
+    "open_in_tab": true,
+    "page": "options/options.html"
+  },
+  "incognito": "not_allowed"
 }

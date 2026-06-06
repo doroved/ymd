@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "Yandex Music Downloader",
+  "short_name": "YMDownloader",
+  "description": "Скачиваем Я.Музыку быстро, бесплатно и в высоком качестве!",
+  "version": "0.1.0",
+  "homepage_url": "https://github.com/doroved/ymd",
+  "minimum_chrome_version": "109",
+  "permissions": ["storage", "downloads"],
+  "host_permissions": [
+    "*://api.music.yandex.ru/*",
+    "*://api.music.yandex.by/*",
+    "*://api.music.yandex.kz/*",
+    "*://api.music.yandex.uz/*",
+    "*://api.music.yandex.com/*"
+  ],
+  "action": {
+    "default_title": "Yandex Music Downloader"
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "background": {
+    "service_worker": "src/sw.js"
+  },
+  "content_scripts": [
+    {
+      "all_frames": true,
+      "css": ["src/content.css"],
+      "js": ["src/tag.js", "src/content.js"],
+      "matches": [
+        "*://music.yandex.ru/*",
+        "*://music.yandex.by/*",
+        "*://music.yandex.kz/*",
+        "*://music.yandex.uz/*",
+        "*://music.yandex.com/*"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "options_page": "options/options.html",
+  "options_ui": {
+    "open_in_tab": true,
+    "page": "options/options.html"
+  },
+  "incognito": "not_allowed"
+}

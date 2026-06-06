@@ -1,27 +1,23 @@
-/**
- * Yandex Music Downloader - Extension Options Page
- * Manages saving and loading user preferences (quality, ID3 tagging, target download folders).
- * Refactored to be clean, readable, and well-structured.
- */
+/// <reference types="chrome" />
+
+declare global {
+  var browser: typeof chrome | undefined;
+}
 
 (() => {
   const browserApi = globalThis.browser || globalThis.chrome;
 
-  // DOM Elements cache
   const elements = {
-    qualitySelect: document.getElementById("bitrateQuality"),
-    tagsCheckbox: document.getElementById("tags"),
-    userFolderCheckbox: document.getElementById("userFolder"),
-    folderNameInput: document.getElementById("folderName"),
-    folderContainer: document.getElementById("folder"),
-    positionCheckbox: document.getElementById("position"),
-    coverSizeSelect: document.getElementById("coverSize")
+    qualitySelect: document.getElementById("bitrateQuality") as HTMLSelectElement,
+    tagsCheckbox: document.getElementById("tags") as HTMLInputElement,
+    userFolderCheckbox: document.getElementById("userFolder") as HTMLInputElement,
+    folderNameInput: document.getElementById("folderName") as HTMLInputElement,
+    folderContainer: document.getElementById("folder") as HTMLDivElement,
+    positionCheckbox: document.getElementById("position") as HTMLInputElement,
+    coverSizeSelect: document.getElementById("coverSize") as HTMLSelectElement,
   };
 
-  /**
-   * Refreshes the options UI state based on values stored in local storage
-   */
-  function updateSchema(folderName) {
+  function updateSchema(folderName: string): void {
     const name = (folderName || "YMDownloader").trim();
     const schemaElement = document.getElementById("folderSchema");
     if (!schemaElement) return;
@@ -30,22 +26,13 @@
     const indexPrefix = useIndex ? "[Индекс]. " : "";
 
     schemaElement.textContent =
-`Downloads/
-└── ${name}/
-    ├── tracks/ (одиночные файлы)
-    │   └── Исполнитель - Трек.mp3
-    ├── albums/
-    │   └── Название Альбома/
-    │       └── ${indexPrefix}Исполнитель - Трек.mp3
-    └── playlists/
-        └── Название Плейлиста/
-            └── ${indexPrefix}Исполнитель - Трек.mp3`;
+      `Downloads/\n└── ${name}/\n    ├── tracks/ (одиночные файлы)\n    │   └── Исполнитель - Трек.mp3\n    ├── albums/\n    │   └── Название Альбома/\n    │       └── ${indexPrefix}Исполнитель - Трек.mp3\n    └── playlists/\n        └── Название Плейлиста/\n            └── ${indexPrefix}Исполнитель - Трек.mp3`;
   }
 
-  function refreshUI() {
+  function refreshUI(): void {
     browserApi.storage.local.get(
       ["quality", "tags", "folder", "path", "position", "cover"],
-      (config) => {
+      (config: Record<string, any>) => {
         elements.qualitySelect.value = config.quality || "hq";
         elements.coverSizeSelect.value = config.cover || "400x400";
 
@@ -64,10 +51,7 @@
     );
   }
 
-  /**
-   * Binds change and input handlers for all option controls
-   */
-  function bindEventHandlers() {
+  function bindEventHandlers(): void {
     elements.qualitySelect.addEventListener("change", () => {
       browserApi.storage.local.set({ quality: elements.qualitySelect.value });
     });
@@ -92,7 +76,6 @@
       });
     });
 
-    // Sanitize subfolder name to only allow safe alphanumeric and hyphen/underscore characters
     elements.folderNameInput.addEventListener("input", () => {
       const sanitizedPath = elements.folderNameInput.value.replace(/[^a-z0-9A-Zа-яА-Я\-_]/gi, "");
       browserApi.storage.local.set({ path: sanitizedPath }, () => {
@@ -101,8 +84,7 @@
     });
   }
 
-  // Initialize page configuration
-  browserApi.storage.local.get(["path", "folder", "position"], (config) => {
+  browserApi.storage.local.get(["path", "folder", "position"], (config: Record<string, any>) => {
     if (config.path === undefined) {
       browserApi.storage.local.set({ folder: false, path: "YMDownloader", position: false }, () => {
         refreshUI();
