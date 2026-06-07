@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "YandexMusicDownloader",
+  "name": "Yandex Music Downloader",
   "short_name": "YMDownloader",
-  "description": "Скачивайте любые треки с Яндекс.Музыка в высоком качестве. Просто и удобно!",
+  "description": "Скачиваем Я.Музыку быстро, бесплатно и в высоком качестве!",
   "version": "0.1.0",
   "homepage_url": "https://github.com/doroved/ymd",
   "permissions": ["storage", "downloads"],
@@ -23,7 +23,7 @@
     "scripts": ["src/sw.js"]
   },
   "action": {
-    "default_title": "YandexMusicDownloader"
+    "default_title": "Yandex Music Downloader"
   },
   "icons": {
     "16": "icons/16.png",
