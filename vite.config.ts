@@ -43,6 +43,12 @@ function copyAssetsPlugin(): Plugin {
       mkdirSync(destWelcome, { recursive: true });
       copyFileSync(resolve("src/welcome/welcome.html"), resolve(destWelcome, "welcome.html"));
       copyFileSync(resolve("src/welcome/welcome.css"), resolve(destWelcome, "welcome.css"));
+
+      // 4. Changelog pages
+      const destChangelog = resolve(srcDir, "changelog");
+      mkdirSync(destChangelog, { recursive: true });
+      copyFileSync(resolve("src/changelog/changelog.html"), resolve(destChangelog, "changelog.html"));
+      copyFileSync(resolve("src/changelog/changelog.css"), resolve(destChangelog, "changelog.css"));
     },
   };
 }

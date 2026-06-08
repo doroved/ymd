@@ -8,6 +8,8 @@ declare global {
   const browserApi = globalThis.browser || globalThis.chrome;
 
   const elements = {
+    formatSelect: document.getElementById("audioFormat") as HTMLSelectElement,
+    bitrateRow: document.getElementById("bitrateRow") as HTMLDivElement,
     qualitySelect: document.getElementById("bitrateQuality") as HTMLSelectElement,
     tagsCheckbox: document.getElementById("tags") as HTMLInputElement,
     userFolderCheckbox: document.getElementById("userFolder") as HTMLInputElement,
@@ -24,21 +26,33 @@ declare global {
 
     const useIndex = elements.positionCheckbox ? elements.positionCheckbox.checked : false;
     const indexPrefix = useIndex ? "[Индекс]. " : "";
+    const ext = elements.formatSelect.value === "flac" ? ".flac" : ".mp3";
 
     schemaElement.textContent =
-      `Downloads/\n└── ${name}/\n    ├── tracks/ (одиночные файлы)\n    │   └── Исполнитель - Трек.mp3\n    ├── albums/\n    │   └── Название Альбома/\n    │       └── ${indexPrefix}Исполнитель - Трек.mp3\n    └── playlists/\n        └── Название Плейлиста/\n            └── ${indexPrefix}Исполнитель - Трек.mp3`;
+      `Downloads/\n└── ${name}/\n    ├── tracks/ (одиночные файлы)\n    │   └── Исполнитель - Трек${ext}\n    ├── albums/\n    │   └── Название Альбома/\n    │       └── ${indexPrefix}Исполнитель - Трек${ext}\n    └── playlists/\n        └── Название Плейлиста/\n            └── ${indexPrefix}Исполнитель - Трек${ext}`;
+  }
+
+  function toggleBitrateVisibility(): void {
+    if (elements.formatSelect.value === "flac") {
+      elements.bitrateRow.style.display = "none";
+    } else {
+      elements.bitrateRow.style.display = "flex";
+    }
   }
 
   function refreshUI(): void {
     browserApi.storage.local.get(
-      ["quality", "tags", "folder", "path", "position", "cover"],
+      ["quality", "format", "tags", "folder", "path", "position", "cover"],
       (config: Record<string, any>) => {
+        elements.formatSelect.value = config.format || "mp3";
         elements.qualitySelect.value = config.quality || "hq";
         elements.coverSizeSelect.value = config.cover || "400x400";
 
         elements.tagsCheckbox.checked = config.tags !== false;
         elements.positionCheckbox.checked = config.position === true;
         elements.userFolderCheckbox.checked = config.folder === true;
+
+        toggleBitrateVisibility();
 
         if (config.folder === true) {
           elements.folderNameInput.value = config.path || "";
@@ -52,6 +66,13 @@ declare global {
   }
 
   function bindEventHandlers(): void {
+    elements.formatSelect.addEventListener("change", () => {
+      browserApi.storage.local.set({ format: elements.formatSelect.value }, () => {
+        toggleBitrateVisibility();
+        updateSchema(elements.folderNameInput.value);
+      });
+    });
+
     elements.qualitySelect.addEventListener("change", () => {
       browserApi.storage.local.set({ quality: elements.qualitySelect.value });
     });
@@ -86,10 +107,13 @@ declare global {
 
   browserApi.storage.local.get(["path", "folder", "position"], (config: Record<string, any>) => {
     if (config.path === undefined) {
-      browserApi.storage.local.set({ folder: false, path: "YMDownloader", position: false }, () => {
-        refreshUI();
-        updateSchema("YMDownloader");
-      });
+      browserApi.storage.local.set(
+        { folder: false, path: "YMDownloader", position: false, format: "mp3" },
+        () => {
+          refreshUI();
+          updateSchema("YMDownloader");
+        }
+      );
     } else {
       refreshUI();
       updateSchema(config.path);

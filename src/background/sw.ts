@@ -45,6 +45,7 @@ interface DownloadResponse {
 
 interface DefaultConfig {
   quality: string;
+  format: string;
   tags: boolean;
   folder: boolean;
   path: string;
@@ -99,6 +100,7 @@ const tabs = {
 const initDefaultConfig = async (): Promise<void> => {
   const defaults: DefaultConfig = {
     quality: "hq",
+    format: "mp3",
     tags: true,
     folder: false,
     path: "YMDownloader",
@@ -125,6 +127,9 @@ chrome.runtime.onInstalled.addListener(
   async (details: chrome.runtime.InstalledDetails) => {
     if (details.reason === "install") {
       tabs.create({ url: chrome.runtime.getURL("src/welcome/welcome.html") });
+    }
+    if (details.reason === "update") {
+      tabs.create({ url: chrome.runtime.getURL("src/changelog/changelog.html") });
     }
     await initDefaultConfig();
   }
@@ -212,7 +217,8 @@ chrome.runtime.onMessage.addListener(
               "Filename download failed, retrying with fallback name. Error:",
               chrome.runtime.lastError.message
             );
-            const fallbackName = `${Math.floor(Math.random() * 1e15)}.mp3`;
+            const ext = message.filename.split('.').pop() || 'mp3';
+            const fallbackName = `${Math.floor(Math.random() * 1e15)}.${ext}`;
 
             chrome.downloads.download(
               {

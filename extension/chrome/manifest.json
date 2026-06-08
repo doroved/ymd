@@ -12,7 +12,8 @@
     "*://api.music.yandex.by/*",
     "*://api.music.yandex.kz/*",
     "*://api.music.yandex.uz/*",
-    "*://api.music.yandex.com/*"
+    "*://api.music.yandex.com/*",
+    "*://*.strm.yandex.net/*"
   ],
   "action": {
     "default_title": "Yandex Music Downloader"

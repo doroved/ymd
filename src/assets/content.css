@@ -83,3 +83,15 @@ div[class*="PageHeaderBase_controls"] .__ymd_download svg {
 .animate-spin {
   animation: spin 1s linear infinite;
 }
+
+/* Progress circle styles */
+.__ymd_download svg circle {
+  transform-origin: center;
+  transform: rotate(-90deg);
+}
+
+.__ymd_download._downloading svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
