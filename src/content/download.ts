@@ -102,7 +102,7 @@ export async function downloadTrack(
   const trackData = preFetchedMetadata || (await fetchTrackMetadata(trackId));
   const meta = extractMetadata(trackData, fallbackPosition);
 
-  const streamInfo = await getStreamUrl(trackId, format);
+  const streamInfo = await getStreamUrl(trackId, format, config.quality || "hq");
   if (!streamInfo) {
     throw new Error("Could not retrieve Yandex stream URL");
   }

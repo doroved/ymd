@@ -153,6 +153,12 @@ body {
   border: 1px solid rgba(59, 130, 246, 0.25);
 }
 
+.feature-badge.fix {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
 .feature-content {
   display: flex;
   flex-direction: column;

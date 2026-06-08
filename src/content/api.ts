@@ -36,7 +36,8 @@ async function signRequest(signString: string): Promise<string> {
 
 export const getStreamUrl = async (
   trackId: string,
-  format: string
+  format: string,
+  quality = "hq"
 ): Promise<StreamInfo | null> => {
   const timestamp = Math.floor(Date.now() / 1000);
 
@@ -68,11 +69,10 @@ export const getStreamUrl = async (
     }
 
     // Fallback to MP3 if FLAC unavailable
-    return getStreamUrl(trackId, "mp3");
+    return getStreamUrl(trackId, "mp3", quality);
   }
 
   // MP3 path
-  const quality = "hq";
   const signString = `${timestamp}${trackId}${quality}mp3raw`;
   const signature = await signRequest(signString);
   const signUrl =

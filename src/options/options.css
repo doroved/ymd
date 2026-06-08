@@ -412,3 +412,81 @@ input:checked + .slider:before {
 .btn-telegram:active {
   transform: translateY(0);
 }
+
+/* Donate CTA Styling */
+.donate-card {
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  background: radial-gradient(circle at top right, rgba(245, 158, 11, 0.08) 0%, rgba(30, 41, 59, 0.6) 60%);
+}
+
+.donate-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.donate-icon-wrapper {
+  background-color: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f59e0b;
+}
+
+.donate-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.donate-title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.donate-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0;
+}
+
+.donate-tag {
+  font-size: 13px;
+  color: #f59e0b;
+  font-weight: 500;
+}
+
+.btn-donate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 10px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  border: none;
+  background-color: #f59e0b;
+  color: #0f172a;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+  text-align: center;
+}
+
+.btn-donate:hover {
+  background-color: #d97706;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.3);
+}
+
+.btn-donate:active {
+  transform: translateY(0);
+}
