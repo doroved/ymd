@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, cpSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Plugin } from "vite";
 import { defineConfig, type UserConfig } from "vite";
@@ -7,19 +7,42 @@ const outputDirs = ["extension/chrome/src", "extension/firefox/src"];
 
 /**
  * Vite plugin that copies static vendor files (e.g. tag.js)
+ * and shared static assets (icons, options, welcome)
  * into each output directory after the build completes.
  */
-function copyVendorPlugin(): Plugin {
+function copyAssetsPlugin(): Plugin {
   return {
-    name: "copy-vendor",
+    name: "copy-assets",
     writeBundle(options) {
-      const dir = options.dir;
-      if (!dir) return;
-      mkdirSync(dir, { recursive: true });
+      const srcDir = options.dir; // e.g. "extension/chrome/src"
+      if (!srcDir) return;
+
+      const extDir = resolve(srcDir, ".."); // e.g. "extension/chrome"
+
+      // Copy tag.js into extension/*/src/
+      mkdirSync(srcDir, { recursive: true });
       copyFileSync(
         resolve("src/vendor/tag.js"),
-        resolve(dir, "tag.js")
+        resolve(srcDir, "tag.js")
       );
+
+      // Copy static assets (icons, options, welcome) into extension/*/src/
+      // 1. Icons folder
+      const destIcons = resolve(srcDir, "icons");
+      mkdirSync(destIcons, { recursive: true });
+      cpSync(resolve("src/assets/icons"), destIcons, { recursive: true });
+
+      // 2. Options pages
+      const destOptions = resolve(srcDir, "options");
+      mkdirSync(destOptions, { recursive: true });
+      copyFileSync(resolve("src/options/options.html"), resolve(destOptions, "options.html"));
+      copyFileSync(resolve("src/options/options.css"), resolve(destOptions, "options.css"));
+
+      // 3. Welcome pages
+      const destWelcome = resolve(srcDir, "welcome");
+      mkdirSync(destWelcome, { recursive: true });
+      copyFileSync(resolve("src/welcome/welcome.html"), resolve(destWelcome, "welcome.html"));
+      copyFileSync(resolve("src/welcome/welcome.css"), resolve(destWelcome, "welcome.css"));
     },
   };
 }
@@ -33,8 +56,8 @@ export default defineConfig(({ mode }) => {
         input: {
           content: "./src/content/content.ts",
           sw: "./src/background/sw.ts",
-          options: "./src/options/options.ts",
-          welcome: "./src/welcome/welcome.ts",
+          "options/options": "./src/options/options.ts",
+          "welcome/welcome": "./src/welcome/welcome.ts",
           "content-styles": "./src/assets/content.css",
         },
         output: outputDirs.map((dir) => ({
@@ -42,7 +65,7 @@ export default defineConfig(({ mode }) => {
           entryFileNames: "[name].js",
           assetFileNames: "content.css",
         })),
-        plugins: [copyVendorPlugin()],
+        plugins: [copyAssetsPlugin()],
       },
     },
   } satisfies UserConfig;

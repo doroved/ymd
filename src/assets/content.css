@@ -1,7 +1,7 @@
 .button_transparent{margin-left:-5px}.d-track__title{padding-left:5px;margin-top:3px}.d-track__version.deco-typo-secondary{margin-top:3px}.d-track__meta{padding-top:4px!important}.d-link.deco-link.track__title{padding-left:10px!important}.track.track_type_player{height:52px!important}.lightlist__cont{padding-bottom:0!important}
 
 /* Yellow Circular Download Button */
-._yamusic_save_next {
+.__ymd_download {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -18,38 +18,38 @@
   transition: background-color 0.15s ease, transform 0.1s ease;
 }
 
-._yamusic_save_next:hover {
+.__ymd_download:hover {
   background-color: #fff000;
   transform: scale(1.04);
 }
 
-._yamusic_save_next:active {
+.__ymd_download:active {
   transform: scale(0.95);
   background-color: #ebd300;
 }
 
-._yamusic_save_next svg {
+.__ymd_download svg {
   display: block;
 }
 
 /* Adjust size for the "Download All" button in the album/playlist headers */
-div[class*="controls"] ._yamusic_save_next,
-div[class*="mainControls"] ._yamusic_save_next,
-div[class*="PageHeaderBase_controls"] ._yamusic_save_next {
+div[class*="controls"] .__ymd_download,
+div[class*="mainControls"] .__ymd_download,
+div[class*="PageHeaderBase_controls"] .__ymd_download {
   width: 40px;
   height: 40px;
   margin: 0;
 }
 
-div[class*="controls"] ._yamusic_save_next svg,
-div[class*="mainControls"] ._yamusic_save_next svg,
-div[class*="PageHeaderBase_controls"] ._yamusic_save_next svg {
+div[class*="controls"] .__ymd_download svg,
+div[class*="mainControls"] .__ymd_download svg,
+div[class*="PageHeaderBase_controls"] .__ymd_download svg {
   width: 20px;
   height: 20px;
 }
 
 /* Progress/Active State for "Download All" button */
-._yamusic_save_next._downloading {
+.__ymd_download._downloading {
   width: auto !important;
   min-width: 40px;
   height: 40px;
@@ -66,11 +66,11 @@ div[class*="PageHeaderBase_controls"] ._yamusic_save_next svg {
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
-._yamusic_save_next._downloading:hover {
+.__ymd_download._downloading:hover {
   transform: none !important;
 }
 
-._yamusic_save_next._downloading span {
+.__ymd_download._downloading span {
   display: inline-block;
   white-space: nowrap;
 }

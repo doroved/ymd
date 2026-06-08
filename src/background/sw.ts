@@ -124,7 +124,7 @@ chrome.action.onClicked.addListener(() => {
 chrome.runtime.onInstalled.addListener(
   async (details: chrome.runtime.InstalledDetails) => {
     if (details.reason === "install") {
-      tabs.create({ url: chrome.runtime.getURL("welcome/welcome.html") });
+      tabs.create({ url: chrome.runtime.getURL("src/welcome/welcome.html") });
     }
     await initDefaultConfig();
   }

@@ -420,7 +420,7 @@ declare const browserId3Writer: new (buffer: ArrayBuffer) => {
     const controls = container.querySelector(
       "div[class*='ControlsBar_root'], div[class*='PlayerBarDesktop_meta']"
     );
-    if (!controls || controls.querySelector("._yamusic_save_next")) return;
+    if (!controls || controls.querySelector(".__ymd_download")) return;
 
     const buttons = controls.querySelectorAll("button");
     if (buttons.length < 2 || (buttons[1] as HTMLButtonElement).disabled)
@@ -428,7 +428,7 @@ declare const browserId3Writer: new (buffer: ArrayBuffer) => {
 
     const button = document.createElement("button");
     button.type = "button";
-    button.classList.add("_yamusic_save_next");
+    button.classList.add("__ymd_download");
     button.title = "Скачать";
 
     const originalHTML =
@@ -472,11 +472,11 @@ declare const browserId3Writer: new (buffer: ArrayBuffer) => {
   };
 
   const injectHeaderButton = (container: Element): void => {
-    if (container.querySelector("._yamusic_save_next")) return;
+    if (container.querySelector(".__ymd_download")) return;
 
     const button = document.createElement("button");
     button.type = "button";
-    button.classList.add("_yamusic_save_next");
+    button.classList.add("__ymd_download");
     button.title = "Скачать всё";
     button.innerHTML =
       '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>';
