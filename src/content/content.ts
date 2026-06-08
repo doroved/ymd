@@ -317,9 +317,10 @@ declare const browserId3Writer: new (buffer: ArrayBuffer) => {
     const trackLink = el.querySelector('a[href*="/track/"]');
     const href = trackLink?.getAttribute("href") || "";
     const trackId =
-      href.split("/track/")[1]?.split("/")[0] ||
+      href.match(/\/track\/(\d+)/)?.[1] ||
       el.getAttribute("track-id") ||
       el.getAttribute("data-track-id");
+
     const positionText =
       el.querySelector("div[class*='PlayButtonWithPosition_root']")
         ?.textContent || "0";
