@@ -82,54 +82,129 @@ body {
   letter-spacing: 0.02em;
 }
 
-/* Main Content & Cards */
+.version-badge:empty {
+  display: none;
+}
+
+/* Banner */
+.banner-link {
+  display: block;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: opacity 0.2s ease;
+}
+
+.banner-link:hover {
+  opacity: 0.9;
+}
+
+.banner-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+}
+
+/* Main Content */
 .main-content {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-.card {
-  background-color: rgba(30, 41, 59, 0.6);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
+/* Timeline */
+.timeline {
+  position: relative;
+  padding-left: 1px;
 }
 
-.card-title {
-  font-size: 16px;
-  font-weight: 600;
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: var(--border-color);
+}
+
+.timeline-item {
+  position: relative;
+  padding-left: 32px;
+  padding-bottom: 32px;
+}
+
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: var(--text-muted);
+  z-index: 1;
+}
+
+.timeline-dot.active {
+  background-color: var(--accent-color);
+  box-shadow: 0 0 0 4px rgba(255, 230, 0, 0.15), 0 0 12px rgba(255, 230, 0, 0.3);
+}
+
+.timeline-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  margin-bottom: 0;
+}
+
+.timeline-version {
+  font-size: 18px;
+  font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 20px;
+}
+
+.timeline-date {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-left: 8px;
+}
+
+.timeline-changes {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.timeline-change {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.timeline-change-header {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.card-icon {
-  width: 18px;
-  height: 18px;
+.timeline-change-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.timeline-change-desc {
+  font-size: 13px;
   color: var(--text-secondary);
+  line-height: 1.5;
 }
 
-/* Feature items */
-.feature {
-  display: flex;
-  gap: 14px;
-  padding: 16px 0;
-  border-top: 1px solid var(--border-color);
-}
-
-.feature:first-of-type {
-  border-top: none;
-  padding-top: 0;
-}
-
+/* Feature badges */
 .feature-badge {
   flex-shrink: 0;
   font-size: 11px;
@@ -139,6 +214,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   height: fit-content;
+  white-space: nowrap;
 }
 
 .feature-badge.new {
@@ -159,96 +235,19 @@ body {
   border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
-.feature-content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-}
-
-.feature-title {
+/* Loading & Error states */
+.timeline-loading {
+  text-align: center;
+  color: var(--text-muted);
   font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
+  padding: 40px 0;
 }
 
-.feature-desc {
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-}
-
-/* Telegram Card */
-.telegram-card {
-  background: linear-gradient(135deg, #1e293b 0%, #1a2332 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.telegram-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.telegram-icon-wrapper {
-  width: 40px;
-  height: 40px;
-  background-color: #229ed9;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.telegram-icon {
-  width: 22px;
-  height: 22px;
-  color: #fff;
-}
-
-.telegram-title-group {
-  display: flex;
-  flex-direction: column;
-}
-
-.telegram-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.telegram-tag {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.card-description {
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  margin-bottom: 16px;
-}
-
-.btn-telegram {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #229ed9;
-  color: #fff;
-  text-decoration: none;
-  padding: 10px 18px;
-  border-radius: 10px;
+.timeline-error {
+  text-align: center;
+  color: var(--text-muted);
   font-size: 14px;
-  font-weight: 600;
-  transition: background-color 0.2s ease;
-  width: fit-content;
-}
-
-.btn-telegram:hover {
-  background-color: #1c8bc2;
+  padding: 40px 0;
 }
 
 /* Footer */

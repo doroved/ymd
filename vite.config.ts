@@ -49,6 +49,8 @@ function copyAssetsPlugin(): Plugin {
       mkdirSync(destChangelog, { recursive: true });
       copyFileSync(resolve("src/changelog/changelog.html"), resolve(destChangelog, "changelog.html"));
       copyFileSync(resolve("src/changelog/changelog.css"), resolve(destChangelog, "changelog.css"));
+      copyFileSync(resolve("src/changelog/changelog.js"), resolve(destChangelog, "changelog.js"));
+      copyFileSync(resolve("src/changelog/attention.png"), resolve(destChangelog, "attention.png"));
     },
   };
 }
