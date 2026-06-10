@@ -3,3 +3,5 @@ extension/chrome/src
 extension/firefox/src
 extension/releases
 *.tsbuildinfo
+
+.DS_Store
