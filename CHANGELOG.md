@@ -1,6 +1,6 @@
 # Yandex Music Downloader — История изменений
 
-[![Telegram-канал @ymdownloader](attention.png)](https://t.me/ymdownloader)
+> **⚠️ Обязательно подпишитесь на наш Telegram-канал [@ymdownloader](https://t.me/ymdownloader), чтобы не потерять доступ к расширению, если оно вдруг пропадёт из магазина расширений!**
 
 ## Версия 0.2.1 — 2026-06-09
 
