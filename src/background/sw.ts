@@ -25,6 +25,13 @@ interface DownloadMessage {
   filename: string;
 }
 
+interface DownloadBytesMessage {
+  message: "downloadBytes";
+  bytes: Uint8Array;
+  filename: string;
+  mimeType: string;
+}
+
 interface CheckMessage {
   message: "check";
 }
@@ -33,13 +40,8 @@ type ExtensionMessage =
   | TrackMetadataMessage
   | DownloadInfoMessage
   | DownloadMessage
+  | DownloadBytesMessage
   | CheckMessage;
-
-interface DownloadResponse {
-  status: string;
-  message: string;
-  url: string;
-}
 
 // ── Default config ──────────────────────────────────────────────────
 
@@ -120,6 +122,23 @@ const initDefaultConfig = async (): Promise<void> => {
 chrome.action.onClicked.addListener(() => {
   tabs.create({ url: "https://music.yandex.ru" });
 });
+
+// ── Filename override bridge for Chrome (UUID blob URL workaround) ──
+// When other extensions register onDeterminingFilename and return without
+// calling suggest(), Chrome falls back to the blob URL's UUID as filename.
+// We persist the real filename keyed by blob URL so our listener can
+// suggest the correct name even though item.filename holds the UUID.
+
+const pendingFilenames = new Map<string, string>();
+
+if (chrome.downloads?.onDeterminingFilename && !/firefox/i.test(navigator.userAgent)) {
+  chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
+    if (item.byExtensionId === chrome.runtime.id) {
+      const realName = pendingFilenames.get(item.url) || item.filename;
+      suggest({ filename: realName, conflictAction: "overwrite" });
+    }
+  });
+}
 
 // ── Setup listeners on startup and installation ─────────────────────
 
@@ -204,7 +223,12 @@ chrome.runtime.onMessage.addListener(
       return true;
     }
 
+    // Chrome: blob URL from content script (original behavior)
     if (message.message === "download") {
+      // Bridge real filename for onDeterminingFilename — Chrome replaces
+      // blob URL filename with UUID when other extensions register listeners.
+      pendingFilenames.set(message.url, message.filename);
+
       chrome.downloads.download(
         {
           url: message.url,
@@ -217,7 +241,7 @@ chrome.runtime.onMessage.addListener(
               "Filename download failed, retrying with fallback name. Error:",
               chrome.runtime.lastError.message
             );
-            const ext = message.filename.split('.').pop() || 'mp3';
+            const ext = message.filename.split(".").pop() || "mp3";
             const fallbackName = `${Math.floor(Math.random() * 1e15)}.${ext}`;
 
             chrome.downloads.download(
@@ -227,24 +251,65 @@ chrome.runtime.onMessage.addListener(
                 conflictAction: "overwrite",
               },
               () => {
-                const response: DownloadResponse = {
-                  status: "done",
-                  message: "100%",
-                  url: message.url,
-                };
-                sendResponse(response);
+                pendingFilenames.delete(message.url);
+                sendResponse({ status: "done" });
               }
             );
           } else {
-            const response: DownloadResponse = {
-              status: "done",
-              message: "100%",
-              url: message.url,
-            };
-            sendResponse(response);
+            // Clean up after a delay to ensure onDeterminingFilename fired
+            setTimeout(() => pendingFilenames.delete(message.url), 5000);
+            sendResponse({ status: "done" });
           }
         }
       );
+
+      return true;
+    }
+
+    // Firefox: Uint8Array bytes → background script creates blob URL → download
+    if (message.message === "downloadBytes") {
+      try {
+        const blob = new Blob([message.bytes as unknown as ArrayBuffer], {
+          type: message.mimeType,
+        });
+        const url = URL.createObjectURL(blob);
+
+        chrome.downloads.download(
+          {
+            url: url,
+            filename: message.filename,
+            conflictAction: "overwrite",
+          },
+          () => {
+            if (chrome.runtime.lastError) {
+              console.warn(
+                "Filename download failed, retrying with fallback name. Error:",
+                chrome.runtime.lastError.message
+              );
+              const ext = message.filename.split(".").pop() || "mp3";
+              const fallbackName = `${Math.floor(Math.random() * 1e15)}.${ext}`;
+
+              chrome.downloads.download(
+                {
+                  url: url,
+                  filename: fallbackName,
+                  conflictAction: "overwrite",
+                },
+                () => {
+                  URL.revokeObjectURL(url);
+                  sendResponse({ status: "done" });
+                }
+              );
+            } else {
+              URL.revokeObjectURL(url);
+              sendResponse({ status: "done" });
+            }
+          }
+        );
+      } catch (err) {
+        console.error("Download failed:", err);
+        sendResponse({ status: "error", message: String(err) });
+      }
 
       return true;
     }

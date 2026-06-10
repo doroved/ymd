@@ -9,6 +9,7 @@ import { tagMp3 } from "./mp3.ts";
 import { sanitizeFilename, getFileExtension, buildFolderPath } from "./utils.ts";
 import { triggerDownload } from "./save.ts";
 
+
 async function fetchTrackMetadata(trackId: string): Promise<any> {
   const apiResponse = await apiCall(
     "https://api.music.yandex.ru/tracks",
@@ -125,10 +126,11 @@ export async function downloadTrack(
   const ext = getFileExtension(format, streamInfo.codec);
 
   let blobUrl: string;
+  let flacBuffer: ArrayBuffer | undefined;
 
   if (isFlac) {
     // Demux MP4 → FLAC
-    let flacBuffer = demuxMp4FlacToFlac(audioBuffer, coverBuffer);
+    flacBuffer = demuxMp4FlacToFlac(audioBuffer, coverBuffer);
 
     // Inject Vorbis Comments if tags enabled
     if (config.tags !== false) {
@@ -179,13 +181,38 @@ export async function downloadTrack(
 
   const filename = `${finalFolder}${positionPrefix}${cleanFilename}`;
 
+  const isFirefox = navigator.vendor === "";
+
+  if (isFirefox) {
+    // Firefox: Uint8Array + background script (avoids content script restrictions)
+    const buffer = isFlac
+      ? flacBuffer!
+      : await fetch(blobUrl).then((r) => r.arrayBuffer());
+
+    // Deep-clone into a fresh Uint8Array so structured clone in Firefox
+    // does not trip over cross-context ArrayBuffer constructors.
+    const original = new Uint8Array(buffer);
+    const clone = new Uint8Array(original.length);
+    clone.set(original);
+
+    chrome.runtime.sendMessage({
+      message: "downloadBytes",
+      bytes: clone,
+      filename,
+      mimeType: isFlac ? "audio/flac" : "audio/mpeg",
+    });
+    return;
+  }
+
+  // Chrome:
+  // FLAC downloaded directly from content script (blob URL not accessible in SW)
+  // MP3 sent to service worker (blob URL, not bytes — Chrome sendMessage limit 64MiB)
   if (isFlac) {
-    // Download FLAC directly from content script (MV3 blob scope fix)
     triggerDownload(blobUrl, filename);
     return;
   }
 
-  // MP3: send to service worker
+  // Chrome MP3: send blob URL to service worker
   return new Promise<void>((resolve) => {
     chrome.runtime.sendMessage(
       { message: "download", url: blobUrl, filename },

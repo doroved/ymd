@@ -300,7 +300,7 @@ export function injectHeaderButton(container: Element): void {
       button.style.backgroundColor = "";
       button.style.color = "";
       console.error("Bulk download failed:", err);
-      alert(`Ошибка скачивания: ${err instanceof Error ? err.message : err}`);
+      alert(`Ошибка скачивания: ${typeof err === 'object' && err !== null && 'message' in err ? (err as Error).message : String(err)}`);
       updateStatus("", false);
     }
   });
