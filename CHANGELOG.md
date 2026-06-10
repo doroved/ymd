@@ -1,4 +1,4 @@
-# История изменений
+# Yandex Music Downloader: История изменений
 
 [![Telegram-канал @ymdownloader](attention.png)](https://t.me/ymdownloader)
 
