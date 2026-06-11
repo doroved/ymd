@@ -48,5 +48,17 @@
     "page": "src/options/options.html"
   },
 
-  "incognito": "not_allowed"
+  "incognito": "not_allowed",
+  "web_accessible_resources": [
+    {
+      "resources": ["src/ymd.png"],
+      "matches": [
+        "*://music.yandex.ru/*",
+        "*://music.yandex.by/*",
+        "*://music.yandex.kz/*",
+        "*://music.yandex.uz/*",
+        "*://music.yandex.com/*"
+      ]
+    }
+  ]
 }

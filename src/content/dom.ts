@@ -376,6 +376,28 @@ export function injectHeaderButton(container: Element): void {
   });
 
   container.prepend(button);
+  injectTelegramButton(container, button);
+}
+
+function injectTelegramButton(container: Element, afterElement: HTMLElement): void {
+  if (container.querySelector(".__ymd_telegram")) return;
+
+  const link = document.createElement("a");
+  link.href = "https://t.me/ymdownloader";
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.classList.add("__ymd_telegram");
+  link.title = "YMD в Telegram";
+
+  const iconUrl = chrome.runtime.getURL("src/ymd.png");
+  const img = document.createElement("img");
+  img.src = iconUrl;
+  img.alt = "YMD";
+  img.width = 24;
+  img.height = 24;
+  link.appendChild(img);
+
+  afterElement.insertAdjacentElement("afterend", link);
 }
 
 export function scanPage(): void {
