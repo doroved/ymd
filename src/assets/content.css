@@ -95,3 +95,12 @@ div[class*="PageHeaderBase_controls"] .__ymd_download svg {
   height: 20px;
   flex-shrink: 0;
 }
+
+/* Player bar download button */
+.__ymd_download_player {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  margin-right: 4px;
+  z-index: 999;
+}

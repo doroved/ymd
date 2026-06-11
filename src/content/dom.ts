@@ -102,6 +102,76 @@ async function fetchTracksFromAPI(): Promise<BulkTrackItem[] | null> {
   return null;
 }
 
+function extractPlayerBarTrackId(): string | null {
+  const descriptionDiv = document.querySelector(
+    "div[class*='PlayerBarDesktopWithBackgroundProgressBar_description']"
+  );
+  if (!descriptionDiv) return null;
+  const link = descriptionDiv.querySelector('a[href*="/track/"]');
+  if (!link) return null;
+  const href = link.getAttribute("href") || "";
+  return href.match(/\/track\/(\d+)/)?.[1] || null;
+}
+
+export function injectPlayerBarButton(): void {
+  const containers = document.querySelectorAll(
+    "div[class*='PlayerBarDesktopWithBackgroundProgressBar_meta'], div[class*='PlayerBarMobile_infoButtons']"
+  );
+
+  containers.forEach((container) => {
+    if (container.querySelector(".__ymd_download_player")) return;
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.classList.add("__ymd_download", "__ymd_download_player");
+    button.title = "Скачать текущий трек";
+
+    const originalHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>';
+    button.innerHTML = originalHTML;
+
+    button.addEventListener("click", async (e: MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (button.disabled) return;
+      button.disabled = true;
+
+      const trackId = extractPlayerBarTrackId();
+      if (!trackId) {
+        button.disabled = false;
+        return;
+      }
+
+      try {
+        button.innerHTML =
+          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" stroke-width="4" opacity="0.3"/><circle class="ymd-progress" cx="18" cy="18" r="16" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="0, 100"/></svg>';
+
+        await enqueueDownload(trackId, 0, (percent: number) => {
+          const circle = button.querySelector(".ymd-progress");
+          if (circle) {
+            circle.setAttribute("stroke-dasharray", `${percent}, 100`);
+          }
+        });
+
+        button.innerHTML =
+          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+      } catch (err) {
+        console.error("Player bar download failed:", err);
+        button.innerHTML = originalHTML;
+        button.disabled = false;
+        return;
+      }
+
+      setTimeout(() => {
+        button.innerHTML = originalHTML;
+        button.disabled = false;
+      }, 2000);
+    });
+
+    container.prepend(button);
+  });
+}
+
 export function injectTrackButton(container: Element): void {
   const controls = container.querySelector(
     "div[class*='ControlsBar_root'], div[class*='PlayerBarDesktop_meta']"
@@ -326,4 +396,6 @@ export function scanPage(): void {
     header.classList.add("_ym_ready_hdr");
     injectHeaderButton(header);
   }
+
+  injectPlayerBarButton();
 }
