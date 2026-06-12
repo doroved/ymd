@@ -169,6 +169,7 @@ export function injectPlayerBarButton(): void {
     });
 
     container.prepend(button);
+    injectTelegramButton(container, button);
   });
 }
 
@@ -388,13 +389,13 @@ function injectTelegramButton(container: Element, afterElement: HTMLElement): vo
   link.rel = "noopener noreferrer";
   link.classList.add("__ymd_telegram");
   link.title = "YMD в Telegram";
+  link.draggable = false;
 
   const iconUrl = chrome.runtime.getURL("src/ymd.png");
   const img = document.createElement("img");
   img.src = iconUrl;
   img.alt = "YMD";
-  img.width = 24;
-  img.height = 24;
+  img.draggable = false;
   link.appendChild(img);
 
   afterElement.insertAdjacentElement("afterend", link);

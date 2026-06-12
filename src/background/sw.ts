@@ -120,7 +120,7 @@ const initDefaultConfig = async (): Promise<void> => {
 // ── Listen for action click to open Yandex Music ────────────────────
 
 chrome.action.onClicked.addListener(() => {
-  tabs.create({ url: "https://music.yandex.ru" });
+  tabs.create({ url: chrome.runtime.getURL("src/options/options.html") });
 });
 
 // ── Filename override bridge for Chrome (UUID blob URL workaround) ──

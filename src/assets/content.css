@@ -98,11 +98,15 @@ div[class*="PageHeaderBase_controls"] .__ymd_download svg {
 
 /* Player bar download button */
 .__ymd_download_player {
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
-  margin-right: 4px;
   z-index: 999;
+}
+
+.__ymd_download_player svg {
+  width: 20px;
+  height: 20px;
 }
 
 /* Telegram button next to "Download All" */
@@ -115,6 +119,7 @@ div[class*="PageHeaderBase_controls"] .__ymd_download svg {
   border-radius: 50%;
   overflow: hidden;
   cursor: pointer;
+  z-index: 999;
   transition: transform 0.15s ease;
 }
 
@@ -131,4 +136,7 @@ div[class*="PageHeaderBase_controls"] .__ymd_download svg {
   height: 100%;
   object-fit: cover;
   display: block;
+  pointer-events: none;
+  -webkit-user-drag: none;
+  user-select: none;
 }
