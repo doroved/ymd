@@ -42,11 +42,11 @@ export const getStreamUrl = async (
   const timestamp = Math.floor(Date.now() / 1000);
 
   if (format === "flac") {
-    const signString = `${timestamp}${trackId}losslessflac-mp4encraw`;
+    const signString = `${timestamp}${trackId}losslessflac-mp4raw`;
     const signature = await signRequest(signString);
     const signUrl =
       `https://api.music.yandex.ru/get-file-info?ts=${timestamp}&trackId=${trackId}` +
-      `&quality=lossless&codecs=flac-mp4&transports=encraw&sign=${encodeURIComponent(signature)}`;
+      `&quality=lossless&codecs=flac-mp4&transports=raw&sign=${encodeURIComponent(signature)}`;
 
     const info: any = await chrome.runtime.sendMessage({
       message: "downloadInfo",
@@ -63,8 +63,7 @@ export const getStreamUrl = async (
       return {
         url: decodeURIComponent(info.downloadInfo.url),
         codec: info.downloadInfo.codec || "flac-mp4",
-        key: info.downloadInfo.key,
-        transport: info.downloadInfo.transport || "encraw",
+        transport: info.downloadInfo.transport || "raw",
       };
     }
 

@@ -38,7 +38,6 @@ export type CheckCancelledFn = () => boolean;
 export interface StreamInfo {
   url: string;
   codec: string;
-  key?: string;
   transport: string;
 }
 

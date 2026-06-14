@@ -3,7 +3,6 @@
  */
 import type { StorageConfig, StreamInfo, BulkContext } from "./types.ts";
 import { apiCall, getStreamUrl } from "./api.ts";
-import { decryptAesCtr } from "./crypto.ts";
 import { demuxMp4FlacToFlac, buildVorbisCommentBlock } from "./flac.ts";
 import { tagMp3 } from "./mp3.ts";
 import { sanitizeFilename, getFileExtension, buildFolderPath } from "./utils.ts";
@@ -109,13 +108,7 @@ export async function downloadTrack(
   }
 
   // Fetch audio with progress
-  let audioBuffer: ArrayBuffer;
-  if (streamInfo.transport === "encraw" && streamInfo.key) {
-    const encrypted = await fetchWithProgress(streamInfo.url, onProgress);
-    audioBuffer = await decryptAesCtr(encrypted, streamInfo.key);
-  } else {
-    audioBuffer = await fetchWithProgress(streamInfo.url, onProgress);
-  }
+  const audioBuffer = await fetchWithProgress(streamInfo.url, onProgress);
 
   // Fetch cover
   const coverBuffer = await fetchCover(meta.coverRawUri, coverSize);
