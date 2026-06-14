@@ -109,6 +109,49 @@ div[class*="PageHeaderBase_controls"] .__ymd_download svg {
   height: 20px;
 }
 
+/* Export track list button next to "Download All" */
+.__ymd_export {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  background-color: #ffe600;
+  color: #000;
+  padding: 0;
+  margin: 0;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.__ymd_export:hover {
+  background-color: #fff000;
+  transform: scale(1.04);
+}
+
+.__ymd_export:active {
+  transform: scale(0.95);
+  background-color: #ebd300;
+}
+
+.__ymd_export svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+.__ymd_export:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.__ymd_export._loading {
+  cursor: default;
+}
+
 /* Telegram button next to "Download All" */
 .__ymd_telegram {
   display: inline-flex;

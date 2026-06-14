@@ -2,6 +2,17 @@
  * Utility helpers
  */
 
+export function getApiZone(): string {
+  const host = typeof location !== "undefined" ? location.host : "";
+  const match = host.match(/music\.ya(?:ndex|ndex)\.([a-z]+)/i);
+  return match?.[1] ? `api.music.yandex.${match[1]}` : "api.music.yandex.ru";
+}
+
+export function getMusicOrigin(): string {
+  const host = typeof location !== "undefined" ? location.host : "music.yandex.ru";
+  return `https://${host}`;
+}
+
 export function sanitizeFilename(name: string): string {
   return name.replace(
     /[?:;"<>/\\|*]|^\s+|[\u200B-\u200D\uFEFF]/gi,

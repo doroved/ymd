@@ -2,6 +2,7 @@
  * Yandex Music API client + stream URL signer
  */
 import type { StreamInfo } from "./types.ts";
+import { getApiZone, getMusicOrigin } from "./utils.ts";
 
 const SIGN_KEY = "7tvSmFbyf5hJnIHhCimDDD";
 
@@ -40,12 +41,14 @@ export const getStreamUrl = async (
   quality = "hq"
 ): Promise<StreamInfo | null> => {
   const timestamp = Math.floor(Date.now() / 1000);
+  const apiHost = getApiZone();
+  const origin = getMusicOrigin();
 
   if (format === "flac") {
     const signString = `${timestamp}${trackId}losslessflac-mp4raw`;
     const signature = await signRequest(signString);
     const signUrl =
-      `https://api.music.yandex.ru/get-file-info?ts=${timestamp}&trackId=${trackId}` +
+      `https://${apiHost}/get-file-info?ts=${timestamp}&trackId=${trackId}` +
       `&quality=lossless&codecs=flac-mp4&transports=raw&sign=${encodeURIComponent(signature)}`;
 
     const info: any = await chrome.runtime.sendMessage({
@@ -55,7 +58,7 @@ export const getStreamUrl = async (
         "x-yandex-music-client": "YandexMusicWebNext/1.0.0",
         "x-yandex-music-without-invocation-info": "1",
         "X-Requested-With": "XMLHttpRequest",
-        Referer: "https://music.yandex.ru/",
+        Referer: `${origin}/`,
       },
     });
 
@@ -75,7 +78,7 @@ export const getStreamUrl = async (
   const signString = `${timestamp}${trackId}${quality}mp3raw`;
   const signature = await signRequest(signString);
   const signUrl =
-    `https://api.music.yandex.ru/get-file-info?ts=${timestamp}&trackId=${trackId}` +
+    `https://${apiHost}/get-file-info?ts=${timestamp}&trackId=${trackId}` +
     `&quality=${quality}&codecs=mp3&transports=raw&sign=${encodeURIComponent(signature)}`;
 
   const info: any = await chrome.runtime.sendMessage({
@@ -85,7 +88,7 @@ export const getStreamUrl = async (
       "x-yandex-music-client": "YandexMusicWebNext/1.0.0",
       "x-yandex-music-without-invocation-info": "1",
       "X-Requested-With": "XMLHttpRequest",
-      Referer: "https://music.yandex.ru/",
+      Referer: `${origin}/`,
     },
   });
 

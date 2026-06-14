@@ -5,13 +5,14 @@ import type { StorageConfig, StreamInfo, BulkContext } from "./types.ts";
 import { apiCall, getStreamUrl } from "./api.ts";
 import { demuxMp4FlacToFlac, buildVorbisCommentBlock } from "./flac.ts";
 import { tagMp3 } from "./mp3.ts";
-import { sanitizeFilename, getFileExtension, buildFolderPath } from "./utils.ts";
+import { sanitizeFilename, getFileExtension, buildFolderPath, getApiZone } from "./utils.ts";
 import { triggerDownload } from "./save.ts";
 
 
 async function fetchTrackMetadata(trackId: string): Promise<any> {
+  const apiHost = getApiZone();
   const apiResponse = await apiCall(
-    "https://api.music.yandex.ru/tracks",
+    `https://${apiHost}/tracks`,
     `trackIds=${trackId}&removeDuplicates=false&withProgress=true`
   );
   if (!apiResponse || !apiResponse[0]) {

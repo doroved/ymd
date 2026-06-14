@@ -4,6 +4,7 @@
 import type { ExtractedTrackMeta, BulkTrackItem, BulkContext } from "./types.ts";
 import { enqueueDownload } from "./queue.ts";
 import { downloadBulk } from "./bulk.ts";
+import { fetchPlaylistAlbumTracks, exportTrackList } from "./export.ts";
 
 function extractTrackMeta(el: Element): ExtractedTrackMeta | null {
   const trackLink = el.querySelector('a[href*="/track/"]');
@@ -20,86 +21,8 @@ function extractTrackMeta(el: Element): ExtractedTrackMeta | null {
 }
 
 async function fetchTracksFromAPI(): Promise<BulkTrackItem[] | null> {
-  const path = window.location.pathname;
-
-  const playlistUserMatch = path.match(/\/users\/([^/]+)\/playlists\/(\d+)/i);
-  if (playlistUserMatch) {
-    const user = playlistUserMatch[1];
-    const kind = playlistUserMatch[2];
-    const res: any = await fetch(
-      `https://api.music.yandex.ru/users/${user}/playlists/${kind}?resumeStream=false&richTracks=true`,
-      { credentials: "include" }
-    )
-      .then((r) => r.json())
-      .catch(() => null);
-
-    if (res?.result?.tracks) {
-      const playlistTitle: string = res.result.title || "Unknown Playlist";
-      return res.result.tracks.map(
-        (t: any, idx: number): BulkTrackItem => ({
-          trackId: t.track.id,
-          position: idx + 1,
-          trackData: t.track,
-          bulkContext: { type: "playlist", title: playlistTitle },
-        })
-      );
-    }
-  }
-
-  const playlistIdMatch = path.match(/\/playlists\/([^/]+)/i);
-  if (playlistIdMatch) {
-    const playlistId = playlistIdMatch[1];
-    const res: any = await fetch(
-      `https://api.music.yandex.ru/playlist/${playlistId}?resumeStream=false&richTracks=true`,
-      { credentials: "include" }
-    )
-      .then((r) => r.json())
-      .catch(() => null);
-
-    if (res?.result?.tracks) {
-      const playlistTitle: string = res.result.title || "Unknown Playlist";
-      return res.result.tracks.map(
-        (t: any, idx: number): BulkTrackItem => ({
-          trackId: t.track.id,
-          position: idx + 1,
-          trackData: t.track,
-          bulkContext: { type: "playlist", title: playlistTitle },
-        })
-      );
-    }
-  }
-
-  const albumMatch = path.match(/\/album\/(\d+)/i);
-  if (albumMatch) {
-    const albumId = albumMatch[1];
-    const res: any = await fetch(
-      `https://api.music.yandex.ru/albums/${albumId}/with-tracks?resumeStream=false&richTracks=true&withListeningFinished=true`,
-      { credentials: "include" }
-    )
-      .then((r) => r.json())
-      .catch(() => null);
-
-    if (res?.result?.volumes) {
-      const albumTitle: string = res.result.title || "Unknown Album";
-      const tracks: BulkTrackItem[] = [];
-      let position = 1;
-      res.result.volumes.forEach((volume: any) => {
-        if (Array.isArray(volume)) {
-          volume.forEach((t: any) => {
-            tracks.push({
-              trackId: t.id,
-              position: position++,
-              trackData: t,
-              bulkContext: { type: "album", title: albumTitle },
-            });
-          });
-        }
-      });
-      return tracks;
-    }
-  }
-
-  return null;
+  const result = await fetchPlaylistAlbumTracks();
+  return result?.items || null;
 }
 
 function extractPlayerBarTrackId(): string | null {
@@ -378,6 +301,49 @@ export function injectHeaderButton(container: Element): void {
 
   container.prepend(button);
   injectTelegramButton(container, button);
+  injectExportButton(container, button);
+}
+
+function injectExportButton(container: Element, afterElement: HTMLElement): void {
+  if (container.querySelector(".__ymd_export")) return;
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.classList.add("__ymd_export");
+  button.title = "Экспортировать список треков в TXT";
+
+  const originalHTML =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>';
+  button.innerHTML = originalHTML;
+
+  button.addEventListener("click", async (e: MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (button.classList.contains("_loading")) return;
+    button.classList.add("_loading");
+
+    button.innerHTML =
+      '<svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>';
+
+    try {
+      await exportTrackList();
+      button.innerHTML =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert(`Ошибка экспорта: ${err instanceof Error ? err.message : String(err)}`);
+      button.innerHTML = originalHTML;
+      button.classList.remove("_loading");
+      return;
+    }
+
+    setTimeout(() => {
+      button.innerHTML = originalHTML;
+      button.classList.remove("_loading");
+    }, 2000);
+  });
+
+  afterElement.insertAdjacentElement("afterend", button);
 }
 
 function injectTelegramButton(container: Element, afterElement: HTMLElement): void {
