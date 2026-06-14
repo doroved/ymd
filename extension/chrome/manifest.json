@@ -3,7 +3,7 @@
   "name": "Yandex Music Downloader",
   "short_name": "YMDownloader",
   "description": "Скачиваем Я.Музыку быстро, бесплатно и в высоком качестве!",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "homepage_url": "https://github.com/doroved/ymd",
   "minimum_chrome_version": "109",
   "permissions": ["storage", "downloads"],
@@ -51,7 +51,7 @@
   "incognito": "not_allowed",
   "web_accessible_resources": [
     {
-      "resources": ["src/ymd.png"],
+      "resources": ["src/ymd.png", "src/donate.png"],
       "matches": [
         "*://music.yandex.ru/*",
         "*://music.yandex.by/*",

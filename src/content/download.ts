@@ -3,10 +3,19 @@
  */
 import type { StorageConfig, StreamInfo, BulkContext } from "./types.ts";
 import { apiCall, getStreamUrl } from "./api.ts";
-import { demuxMp4FlacToFlac, buildVorbisCommentBlock } from "./flac.ts";
+import { demuxMp4FlacToFlac, buildVorbisCommentBlock, buildPictureBlock, insertVorbisCommentAndPicture } from "./flac.ts";
 import { tagMp3 } from "./mp3.ts";
 import { sanitizeFilename, getFileExtension, buildFolderPath, getApiZone } from "./utils.ts";
 import { triggerDownload } from "./save.ts";
+
+function detectMimeType(buffer: ArrayBuffer): string {
+  const b = new Uint8Array(buffer);
+  if (b[0] === 0xff && b[1] === 0xd8) return "image/jpeg";
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "image/png";
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return "image/gif";
+  if (b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return "image/webp";
+  return "image/jpeg";
+}
 
 
 async function fetchTrackMetadata(trackId: string): Promise<any> {
@@ -123,22 +132,29 @@ export async function downloadTrack(
   let flacBuffer: ArrayBuffer | undefined;
 
   if (isFlac) {
-    // Demux MP4 → FLAC
-    flacBuffer = demuxMp4FlacToFlac(audioBuffer, coverBuffer);
+    // Demux MP4 → FLAC (STREAMINFO + SEEKTABLE)
+    flacBuffer = demuxMp4FlacToFlac(audioBuffer);
 
-    // Inject Vorbis Comments if tags enabled
-    if (config.tags !== false) {
-      const vorbisBlock = buildVorbisCommentBlock({
-        TITLE: meta.title,
-        ARTIST: meta.artist,
-        ALBUM: meta.album,
-        DATE: meta.year,
-        GENRE: meta.genre,
-        TRACKNUMBER: meta.trackNumber,
-        ORGANIZATION: meta.publisher,
-      });
-      // Insert after STREAMINFO (first block) and before audio frames
-      flacBuffer = insertVorbisCommentBlock(flacBuffer, vorbisBlock);
+    // Inject Vorbis Comments and optional cover art
+    if (config.tags !== false || coverBuffer) {
+      const vorbisBlock = config.tags !== false
+        ? buildVorbisCommentBlock({
+            TITLE: meta.title,
+            ARTIST: meta.artist,
+            ALBUM: meta.album,
+            DATE: meta.year,
+            GENRE: meta.genre,
+            TRACKNUMBER: meta.trackNumber,
+            ORGANIZATION: meta.publisher,
+          })
+        : new Uint8Array(0);
+      const pictureBlock = coverBuffer
+        ? buildPictureBlock(detectMimeType(coverBuffer), coverBuffer)
+        : null;
+
+      if (vorbisBlock.length || pictureBlock) {
+        flacBuffer = insertVorbisCommentAndPicture(flacBuffer, vorbisBlock, pictureBlock);
+      }
     }
 
     const blob = new Blob([flacBuffer], { type: "audio/flac" });
@@ -218,39 +234,4 @@ export async function downloadTrack(
   });
 }
 
-function insertVorbisCommentBlock(flacBuffer: ArrayBuffer, vorbisBlock: Uint8Array): ArrayBuffer {
-  const buf = new Uint8Array(flacBuffer);
-  // Skip "fLaC" magic
-  let offset = 4;
-  // Walk metadata blocks to find where they end
-  while (offset < buf.length) {
-    if (offset + 4 > buf.length) break;
-    const isLast = (buf[offset] & 0x80) !== 0;
-    const blockSize = (buf[offset + 1] << 16) | (buf[offset + 2] << 8) | buf[offset + 3];
-    if (isLast) {
-      // Insert our block before this last one, and mark this one as not-last
-      const lastBlockData = buf.slice(offset, offset + 4 + blockSize);
-      lastBlockData[0] &= 0x7f; // clear last flag
-      const newBlock = new Uint8Array(vorbisBlock.length);
-      newBlock.set(vorbisBlock);
-      newBlock[0] |= 0x80; // mark as last
 
-      const before = buf.slice(0, offset);
-      const after = buf.slice(offset + 4 + blockSize);
-      const result = new Uint8Array(before.length + lastBlockData.length + newBlock.length + after.length);
-      let pos = 0;
-      result.set(before, pos); pos += before.length;
-      result.set(lastBlockData, pos); pos += lastBlockData.length;
-      result.set(newBlock, pos); pos += newBlock.length;
-      result.set(after, pos);
-      return result.buffer;
-    }
-    offset += 4 + blockSize;
-  }
-  // If no last block found, append at end
-  const result = new Uint8Array(buf.length + vorbisBlock.length);
-  result.set(buf, 0);
-  vorbisBlock[0] |= 0x80;
-  result.set(vorbisBlock, buf.length);
-  return result.buffer;
-}

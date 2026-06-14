@@ -193,11 +193,260 @@ function findDflaInFlacEntry(buf: Uint8Array, flacEntry: Mp4Box): Mp4Box | null 
   return null;
 }
 
+// ── MP4 sample tables helpers ───────────────────────────────────────
+
+function readSampleSizes(stszBox: Mp4Box, buf: Uint8Array): number[] | null {
+  const data = buf.slice(stszBox.dataStart + 4, stszBox.start + stszBox.size);
+  if (data.length < 8) return null;
+  const sampleSize = readUint32(data, 0);
+  const sampleCount = readUint32(data, 4);
+
+  if (sampleCount === 0) return [];
+
+  if (sampleSize !== 0) {
+    return Array.from({ length: sampleCount }, () => sampleSize);
+  }
+
+  const sizes: number[] = [];
+  let offset = 8;
+  for (let i = 0; i < sampleCount; i++) {
+    if (offset + 4 > data.length) break;
+    sizes.push(readUint32(data, offset));
+    offset += 4;
+  }
+  return sizes;
+}
+
+function readSampleChunks(stscBox: Mp4Box, buf: Uint8Array): { firstChunk: number; samplesPerChunk: number }[] {
+  const data = buf.slice(stscBox.dataStart + 4, stscBox.start + stscBox.size);
+  if (data.length < 4) return [];
+  const entryCount = readUint32(data, 0);
+  const entries: { firstChunk: number; samplesPerChunk: number }[] = [];
+  let offset = 4;
+  for (let i = 0; i < entryCount; i++) {
+    if (offset + 12 > data.length) break;
+    const firstChunk = readUint32(data, offset);
+    const samplesPerChunk = readUint32(data, offset + 4);
+    // skip sample description index
+    offset += 12;
+    entries.push({ firstChunk, samplesPerChunk });
+  }
+  return entries;
+}
+
+function readChunkOffsets(co64Box: Mp4Box, buf: Uint8Array): number[] {
+  const data = buf.slice(co64Box.dataStart + 4, co64Box.start + co64Box.size);
+  if (data.length < 4) return [];
+  const entryCount = readUint32(data, 0);
+  const offsets: number[] = [];
+  let offset = 4;
+  for (let i = 0; i < entryCount; i++) {
+    if (offset + 8 > data.length) break;
+    offsets.push(readUint64(data, offset));
+    offset += 8;
+  }
+  return offsets;
+}
+
+function readChunkOffsets32(stcoBox: Mp4Box, buf: Uint8Array): number[] {
+  const data = buf.slice(stcoBox.dataStart + 4, stcoBox.start + stcoBox.size);
+  if (data.length < 4) return [];
+  const entryCount = readUint32(data, 0);
+  const offsets: number[] = [];
+  let offset = 4;
+  for (let i = 0; i < entryCount; i++) {
+    if (offset + 4 > data.length) break;
+    offsets.push(readUint32(data, offset));
+    offset += 4;
+  }
+  return offsets;
+}
+
+function getSamplesPerChunk(chunkNumber: number, entries: { firstChunk: number; samplesPerChunk: number }[]): number {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (chunkNumber >= entries[i].firstChunk) {
+      return entries[i].samplesPerChunk;
+    }
+  }
+  return entries[0]?.samplesPerChunk ?? 0;
+}
+
+function extractAudioFrames(buf: Uint8Array, mdat: Mp4Box): Uint8Array {
+  const stszBox = findBox(buf, 0, buf.length, "stsz");
+  const stscBox = findBox(buf, 0, buf.length, "stsc");
+  const co64Box = findBox(buf, 0, buf.length, "co64");
+  const stcoBox = findBox(buf, 0, buf.length, "stco");
+
+  if (!stszBox || !stscBox || (!co64Box && !stcoBox)) {
+    console.warn("[YMD FLAC] Sample tables missing, falling back to raw mdat");
+    return buf.slice(mdat.dataStart, mdat.start + mdat.size);
+  }
+
+  const sampleSizes = readSampleSizes(stszBox, buf);
+  const chunkEntries = readSampleChunks(stscBox, buf);
+  const chunkOffsets = co64Box ? readChunkOffsets(co64Box, buf) : readChunkOffsets32(stcoBox!, buf);
+
+  if (!sampleSizes || sampleSizes.length === 0 || chunkOffsets.length === 0 || chunkEntries.length === 0) {
+    console.warn("[YMD FLAC] Incomplete sample tables, falling back to raw mdat");
+    return buf.slice(mdat.dataStart, mdat.start + mdat.size);
+  }
+
+  let totalFrameSize = 0;
+  for (const size of sampleSizes) totalFrameSize += size;
+
+  if (totalFrameSize === 0) {
+    console.warn("[YMD FLAC] Total sample size is zero, falling back to raw mdat");
+    return buf.slice(mdat.dataStart, mdat.start + mdat.size);
+  }
+
+  const frames = new Uint8Array(totalFrameSize);
+  let writeOffset = 0;
+  let sampleIndex = 0;
+
+  for (let chunkIndex = 0; chunkIndex < chunkOffsets.length && sampleIndex < sampleSizes.length; chunkIndex++) {
+    const chunkOffset = chunkOffsets[chunkIndex];
+    const chunkNumber = chunkIndex + 1;
+    const samplesInThisChunk = getSamplesPerChunk(chunkNumber, chunkEntries);
+
+    if (chunkOffset + (samplesInThisChunk > 0 ? sampleSizes[sampleIndex] : 0) > buf.length) {
+      console.warn(`[YMD FLAC] Chunk ${chunkNumber} offset out of bounds`);
+      break;
+    }
+
+    let chunkReadOffset = chunkOffset;
+    for (let i = 0; i < samplesInThisChunk && sampleIndex < sampleSizes.length; i++, sampleIndex++) {
+      const sampleSize = sampleSizes[sampleIndex];
+      if (chunkReadOffset + sampleSize > buf.length) {
+        console.warn(`[YMD FLAC] Sample ${sampleIndex} exceeds buffer, truncating`);
+        break;
+      }
+      frames.set(buf.slice(chunkReadOffset, chunkReadOffset + sampleSize), writeOffset);
+      chunkReadOffset += sampleSize;
+      writeOffset += sampleSize;
+    }
+  }
+
+  if (writeOffset !== totalFrameSize) {
+    console.warn(`[YMD FLAC] Extracted ${writeOffset} bytes, expected ${totalFrameSize}`);
+  }
+
+  return frames.slice(0, writeOffset);
+}
+
+// ── FLAC SEEKTABLE helper ───────────────────────────────────────────
+
+function parseStreamInfo(streamInfo: Uint8Array): { minBlockSize: number; maxBlockSize: number; minFrameSize: number; maxFrameSize: number; sampleRate: number; channels: number; bitsPerSample: number; totalSamples: number; md5: Uint8Array } {
+  const view = new DataView(streamInfo.buffer, streamInfo.byteOffset, streamInfo.byteLength);
+
+  const minBlockSize = view.getUint16(0, false);
+  const maxBlockSize = view.getUint16(2, false);
+
+  const minFrameSize = ((view.getUint32(4, false) >> 8) & 0xffffff);
+  const maxFrameSize = ((view.getUint32(7, false) >> 8) & 0xffffff);
+
+  const raw = readUint64(streamInfo, 10);
+  const sampleRate = Number(raw >> 44) & 0x1fffff;
+  const channels = Number((raw >> 41) & 0x7) + 1;
+  const bitsPerSample = Number((raw >> 36) & 0x1f) + 1;
+  const totalSamples = Number(raw & 0xfffffffff);
+
+  const md5 = streamInfo.slice(18, 34);
+
+  return { minBlockSize, maxBlockSize, minFrameSize, maxFrameSize, sampleRate, channels, bitsPerSample, totalSamples, md5 };
+}
+
+function buildSeekTable(frames: Uint8Array, sampleRate: number, minBlockSize: number, totalSamples: number): Uint8Array {
+  const seekPoints: { sampleNumber: number; offset: number; samplesInFrame: number }[] = [];
+
+  const numSeekPoints = Math.max(2, Math.floor(totalSamples / (sampleRate * 10)));
+  const targetInterval = Math.floor(totalSamples / numSeekPoints);
+
+  let offset = 0;
+  let currentSample = 0;
+
+  seekPoints.push({ sampleNumber: 0, offset: 0, samplesInFrame: minBlockSize });
+
+  while (offset < frames.length) {
+    const frameStart = offset;
+    const syncCode = (frames[offset] << 6) | (frames[offset + 1] >> 2);
+    if (syncCode !== 0x3ffe) break;
+
+    const blockSizeBits = ((frames[offset + 2] >> 4) & 0x0f);
+    const sampleRateBits = (frames[offset + 2] & 0x0f);
+
+    let blockSize: number;
+    if (blockSizeBits === 1) blockSize = 192;
+    else if (blockSizeBits >= 2 && blockSizeBits <= 5) blockSize = 576 * Math.pow(2, blockSizeBits - 2);
+    else if (blockSizeBits === 6) blockSize = frames[offset + 5] + 1;
+    else if (blockSizeBits === 7) blockSize = (frames[offset + 5] << 8) + frames[offset + 6] + 1;
+    else break;
+
+    let frameHeaderSize = 5;
+    if (blockSizeBits === 6) frameHeaderSize = 6;
+    else if (blockSizeBits === 7) frameHeaderSize = 7;
+
+    const sampleRateFromHeader = (() => {
+      if (sampleRateBits === 0x0c) return 8000;
+      if (sampleRateBits === 0x0d) return 16000;
+      if (sampleRateBits === 0x0e) return 22050;
+      if (sampleRateBits === 0x0f) return 24000;
+      if (sampleRateBits === 0x10) return 32000;
+      if (sampleRateBits === 0x11) return 44100;
+      if (sampleRateBits === 0x12) return 48000;
+      if (sampleRateBits === 0x13) return 96000;
+      if (sampleRateBits === 0x14) return 88200;
+      if (sampleRateBits === 0x15) return 176400;
+      if (sampleRateBits === 0x16) return 192000;
+      return sampleRate;
+    })();
+
+    let nextFrameOffset = frameStart + frameHeaderSize + blockSize + 2;
+    while (nextFrameOffset + 2 <= frames.length) {
+      const sync = (frames[nextFrameOffset] << 6) | (frames[nextFrameOffset + 1] >> 2);
+      if (sync === 0x3ffe) break;
+      nextFrameOffset++;
+    }
+
+    if (nextFrameOffset > frames.length) nextFrameOffset = frames.length;
+
+    if (currentSample > 0 && currentSample % targetInterval < blockSize && seekPoints.length < numSeekPoints) {
+      seekPoints.push({
+        sampleNumber: currentSample,
+        offset: frameStart,
+        samplesInFrame: blockSize,
+      });
+    }
+
+    offset = nextFrameOffset;
+    currentSample += blockSize;
+
+    if (currentSample >= totalSamples) break;
+  }
+
+  seekPoints.push({ sampleNumber: 0xffffffffffffffff, offset: 0, samplesInFrame: 0 });
+
+  const pointSize = 8 + 8 + 2;
+  const data = new Uint8Array(seekPoints.length * pointSize);
+  const view = new DataView(data.buffer);
+
+  for (let i = 0; i < seekPoints.length; i++) {
+    const p = seekPoints[i];
+    view.setBigUint64(i * pointSize, BigInt.asUintN(64, BigInt(p.sampleNumber)), false);
+    view.setBigUint64(i * pointSize + 8, BigInt.asUintN(64, BigInt(p.offset)), false);
+    view.setUint16(i * pointSize + 16, p.samplesInFrame, false);
+  }
+
+  const header = buildMetadataBlockHeader(3, data.length, false);
+  const block = new Uint8Array(header.length + data.length);
+  block.set(header, 0);
+  block.set(data, header.length);
+  return block;
+}
+
 // ── MP4 → FLAC demuxer ──────────────────────────────────────────────
 
 export function demuxMp4FlacToFlac(
-  mp4Buffer: ArrayBuffer,
-  coverBuffer: ArrayBuffer | null
+  mp4Buffer: ArrayBuffer
 ): ArrayBuffer {
   const buf = new Uint8Array(mp4Buffer);
   const totalSize = buf.length;
@@ -241,21 +490,22 @@ export function demuxMp4FlacToFlac(
 
   if (metadataBlocks.length === 0) throw new Error("MP4 demux: no FLAC metadata blocks");
 
-  const lastOriginal = metadataBlocks[metadataBlocks.length - 1];
-  lastOriginal[0] &= 0x7f;
+  const streamInfo = metadataBlocks[0];
+  const info = parseStreamInfo(streamInfo.slice(4));
 
-  const frames = buf.slice(mdat.dataStart, mdat.start + mdat.size);
+  const frames = extractAudioFrames(buf, mdat);
+  const seekTable = buildSeekTable(frames, info.sampleRate, info.minBlockSize, info.totalSamples);
 
   const magic = new TextEncoder().encode("fLaC");
-  const parts: Uint8Array[] = [magic, ...metadataBlocks];
+  const parts: Uint8Array[] = [magic];
 
-  if (coverBuffer) {
-    const pictureBlock = buildPictureBlock(detectMimeType(coverBuffer), coverBuffer);
-    pictureBlock[0] |= 0x80;
-    parts.push(pictureBlock);
-  } else {
-    lastOriginal[0] |= 0x80;
-  }
+  const streamInfoCopy = new Uint8Array(streamInfo);
+  streamInfoCopy[0] &= 0x7f;
+  parts.push(streamInfoCopy);
+
+  parts.push(seekTable);
+
+  parts[parts.length - 1][0] |= 0x80;
 
   parts.push(frames);
 
@@ -270,6 +520,68 @@ export function demuxMp4FlacToFlac(
   return output.buffer;
 }
 
+export function insertVorbisCommentAndPicture(
+  flacBuffer: ArrayBuffer,
+  vorbisBlock: Uint8Array,
+  pictureBlock: Uint8Array | null
+): ArrayBuffer {
+  const buf = new Uint8Array(flacBuffer);
+
+  let offset = 4;
+  const metaParts: Uint8Array[] = [];
+  let lastMetaEnd = 4;
+
+  while (offset < buf.length) {
+    if (offset + 4 > buf.length) break;
+    const blockSize = (buf[offset + 1] << 16) | (buf[offset + 2] << 8) | buf[offset + 3];
+    if (offset + 4 + blockSize > buf.length) break;
+    metaParts.push(buf.slice(offset, offset + 4 + blockSize));
+    offset += 4 + blockSize;
+    if ((buf[offset - blockSize - 4] & 0x80) !== 0) {
+      lastMetaEnd = offset;
+      break;
+    }
+  }
+
+  for (const block of metaParts) block[0] &= 0x7f;
+
+  const newVorbis = new Uint8Array(vorbisBlock.length);
+  newVorbis.set(vorbisBlock);
+  newVorbis[0] &= 0x7f;
+
+  const newPicture = pictureBlock ? new Uint8Array(pictureBlock.length) : null;
+  if (newPicture && pictureBlock) {
+    newPicture.set(pictureBlock);
+    newPicture[0] &= 0x7f;
+  }
+
+  const frames = buf.slice(lastMetaEnd);
+  const parts: Uint8Array[] = [buf.slice(0, 4), ...metaParts];
+
+  if (newVorbis.length) parts.push(newVorbis);
+  if (newPicture) parts.push(newPicture);
+  parts.push(frames);
+
+  const totalLen = parts.reduce((sum, p) => sum + p.length, 0);
+  const result = new Uint8Array(totalLen);
+  let pos = 0;
+  for (const p of parts) {
+    result.set(p, pos);
+    pos += p.length;
+  }
+
+  const lastMetaBlock = newPicture || newVorbis;
+  if (lastMetaBlock.length) {
+    const lastMetaOffset = pos - frames.length - lastMetaBlock.length;
+    result[lastMetaOffset] |= 0x80;
+  } else if (metaParts.length) {
+    const lastMetaOffset = pos - frames.length - metaParts[metaParts.length - 1].length;
+    result[lastMetaOffset] |= 0x80;
+  }
+
+  return result.buffer;
+}
+
 function detectMimeType(buffer: ArrayBuffer): string {
   const b = new Uint8Array(buffer);
   if (b[0] === 0xff && b[1] === 0xd8) return "image/jpeg";
@@ -278,3 +590,5 @@ function detectMimeType(buffer: ArrayBuffer): string {
   if (b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return "image/webp";
   return "image/jpeg";
 }
+
+export { detectMimeType };
