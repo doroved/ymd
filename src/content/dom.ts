@@ -169,7 +169,7 @@ export function injectPlayerBarButton(): void {
     });
 
     container.prepend(button);
-    injectTelegramButton(container, button);
+    injectDonateButton(container, button);
   });
 }
 
@@ -395,6 +395,27 @@ function injectTelegramButton(container: Element, afterElement: HTMLElement): vo
   const img = document.createElement("img");
   img.src = iconUrl;
   img.alt = "YMD";
+  img.draggable = false;
+  link.appendChild(img);
+
+  afterElement.insertAdjacentElement("afterend", link);
+}
+
+function injectDonateButton(container: Element, afterElement: HTMLElement): void {
+  if (container.querySelector(".__ymd_donate")) return;
+
+  const link = document.createElement("a");
+  link.href = "https://pay.cloudtips.ru/p/2b4c933e";
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.classList.add("__ymd_donate");
+  link.title = "Поддержать YMD";
+  link.draggable = false;
+
+  const iconUrl = chrome.runtime.getURL("src/donate.png");
+  const img = document.createElement("img");
+  img.src = iconUrl;
+  img.alt = "Donate";
   img.draggable = false;
   link.appendChild(img);
 

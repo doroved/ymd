@@ -35,6 +35,9 @@ function copyAssetsPlugin(): Plugin {
       // 2. YMD mascot image
       copyFileSync(resolve("src/assets/ymd.png"), resolve(srcDir, "ymd.png"));
 
+      // 3. Donate image
+      copyFileSync(resolve("src/assets/donate.png"), resolve(srcDir, "donate.png"));
+
       // 2. Options pages
       const destOptions = resolve(srcDir, "options");
       mkdirSync(destOptions, { recursive: true });

@@ -5,3 +5,4 @@ extension/releases
 *.tsbuildinfo
 
 .DS_Store
+NOTE.md
